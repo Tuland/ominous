@@ -15,17 +15,22 @@ Palette letters: "." is transparent, roles (accent, urgent, muted, ...) follow t
 import json
 import os
 import sys
+from typing import Any
+
+Grid = list[list[str]]  # N rows of N palette characters
+Frame = list[str]  # the grid as text rows, as a theme file stores it
+Theme = dict[str, Any]  # a theme file's JSON object
 
 N = 16
 THEMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "themes")
 
 
-def blank():
+def blank() -> Grid:
     """Returns an empty N x N grid, every cell transparent (".")."""
     return [["."] * N for _ in range(N)]
 
 
-def put(g, pts, c):
+def put(g: Grid, pts: list[tuple[int, int]], c: str) -> None:
     """Paints single pixels, skipping any outside the grid.
 
     Args:
@@ -38,7 +43,7 @@ def put(g, pts, c):
             g[y][x] = c
 
 
-def rect(g, x0, y0, x1, y1, c):
+def rect(g: Grid, x0: int, y0: int, x1: int, y1: int, c: str) -> None:
     """Fills a rectangle, corners included.
 
     Args:
@@ -52,13 +57,13 @@ def rect(g, x0, y0, x1, y1, c):
     put(g, [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)], c)
 
 
-def rows(g):
+def rows(g: Grid) -> Frame:
     """Returns the grid as text rows, the form a theme file stores."""
     return ["".join(r) for r in g]
 
 
 # ---------------------------------------------------------------- marine
-def marine(mood, variant=0):
+def marine(mood: str, variant: int = 0) -> Frame:
     """Draws the marine: a soldier in a helmet.
 
     Args:
@@ -117,7 +122,7 @@ def marine(mood, variant=0):
     return rows(g)
 
 
-MARINE = {
+MARINE: Theme = {
     "progress": False,
     "palette": {
         ".": "transparent", "k": "#1b1511", "h": "#55703c", "H": "#7c9a58", "g": "#3c5230",
@@ -134,7 +139,7 @@ MARINE = {
 
 
 # ---------------------------------------------------------------- shiba
-def shiba(mood, variant=0):
+def shiba(mood: str, variant: int = 0) -> Frame:
     """Draws the shiba, the dog of the doge meme style.
 
     Args:
@@ -200,7 +205,7 @@ def shiba(mood, variant=0):
     return rows(g)
 
 
-SHIBA = {
+SHIBA: Theme = {
     "progress": False,
     "palette": {
         ".": "transparent", "k": "#241713", "o": "#e08a3c", "q": "#e2552f", "c": "#f6e7c8",
@@ -216,7 +221,7 @@ SHIBA = {
 
 
 # ---------------------------------------------------------------- boss
-def boss(mood, variant=0):
+def boss(mood: str, variant: int = 0) -> Frame:
     """Draws the boss: an executive in suit and tie.
 
     Args:
@@ -284,7 +289,7 @@ def boss(mood, variant=0):
     return rows(g)
 
 
-BOSS = {
+BOSS: Theme = {
     "progress": False,
     "palette": {
         ".": "transparent", "k": "#1b1511", "H": "#2e2622", "h": "#5a4d44", "s": "#e6b98f", "S": "#c9976c",
@@ -299,10 +304,10 @@ BOSS = {
     },
 }
 
-THEMES = {"marine": MARINE, "shiba": SHIBA, "boss": BOSS}
+THEMES: dict[str, Theme] = {"marine": MARINE, "shiba": SHIBA, "boss": BOSS}
 
 
-def render(theme):
+def render(theme: Theme) -> str:
     """Serializes a theme as its file's text.
 
     One frame row per line keeps the art readable and the diffs small.
@@ -316,7 +321,7 @@ def render(theme):
     return json.dumps(theme, indent=2).replace('",\n          "', '", "') + "\n"
 
 
-def main(args):
+def main(args: list[str]) -> int:
     """Writes, shows or checks the themes.
 
     Args:

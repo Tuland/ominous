@@ -15,6 +15,7 @@
 
 // ---------------------------------------------------------------- Constants
 
+/** @type {Config} */
 var DEFAULTS = {
   calendars: [],      // calendar names or ids; empty = every calendar
   leadSeconds: 60,
@@ -25,7 +26,9 @@ var DEFAULTS = {
   onlyWithLink: false // true = alert only for meetings with an https join link
 }
 
+/** @type {Mode[]} */
 var MODES = ["professional", "playful"]
+/** @type {Phase[]} */
 var PHASES = ["relaxed", "tense", "angry"]
 
 // A meeting that started at most this long ago still alerts: covers a
@@ -38,6 +41,10 @@ var DEFAULT_FRAME_MS = 500
 var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset [professional|playful]"'
 
 /**
+ * @typedef {"professional"|"playful"} Mode
+ * @typedef {"relaxed"|"tense"|"angry"} Phase
+ * @typedef {Object<string, string>} ThemeChoice  Theme name per mode, only for the modes chosen.
+ *
  * @typedef {Object} Config  ominous.json after normalizeConfig; every field has its default.
  * @property {string[]} calendars  Lowercased calendar names or ids; empty = every calendar.
  * @property {number} leadSeconds  How long before the start the card appears.
@@ -71,7 +78,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {Object<string, string>} palette  One character to a color token.
  * @property {number} cols
  * @property {number} rows
- * @property {{relaxed: PhaseLook, tense: PhaseLook, angry: PhaseLook}} phases
+ * @property {Object<string, PhaseLook>} phases  One entry per Phase.
  *
  * @typedef {Object} ThemeFileState  What a watched theme file holds right now.
  * @property {string} status  "loading", "ok", "missing" or "invalid".
@@ -155,6 +162,7 @@ function provider(url) {
  * @returns {Config}
  */
 function normalizeConfig(raw) {
+  /** @type {Config} */
   var cfg = {
     calendars: DEFAULTS.calendars.slice(), leadSeconds: DEFAULTS.leadSeconds, dim: DEFAULTS.dim,
     tenseSeconds: DEFAULTS.tenseSeconds, mode: DEFAULTS.mode,
@@ -163,8 +171,8 @@ function normalizeConfig(raw) {
   }
   if (!raw || typeof raw !== "object") return cfg
   if (Array.isArray(raw.calendars))
-    cfg.calendars = raw.calendars.map(function(c) { return String(c).trim().toLowerCase() })
-                                 .filter(function(c) { return c !== "" })
+    cfg.calendars = raw.calendars.map(function(/** @type {*} */ c) { return String(c).trim().toLowerCase() })
+                                 .filter(function(/** @type {string} */ c) { return c !== "" })
   var lead = Number(raw.leadSeconds)
   if (isFinite(lead) && lead >= 0 && lead <= 3600) cfg.leadSeconds = Math.round(lead)
   var dim = raw.dim === null || raw.dim === undefined ? NaN : Number(raw.dim)
@@ -195,7 +203,7 @@ function parseConfig(text) {
  * The mode in use. The mode saved by the switch wins over the config's; anything unreadable
  * is ignored.
  *
- * @param {string|Object|null} stateRaw The state file's text, or an already parsed object.
+ * @param {*} stateRaw The state file's text, or an already parsed object; untrusted.
  * @param {Config} cfg The config.
  * @returns {string} "professional" or "playful".
  */
@@ -210,15 +218,15 @@ function resolveMode(stateRaw, cfg) {
 /**
  * The theme per mode saved by the `theme` command. Anything unreadable counts as no choice.
  *
- * @param {string|Object|null} saved The themes.json text, or an already parsed object.
- * @returns {{professional: (string|undefined), playful: (string|undefined)}} Only the modes
- *     with a valid saved name.
+ * @param {*} saved The themes.json text, or an already parsed object; untrusted.
+ * @returns {ThemeChoice} Only the modes with a valid saved name.
  */
 function parseThemeOverrides(saved) {
   var raw = saved
   if (typeof raw === "string") {
     try { raw = JSON.parse(raw) } catch (e) { raw = null }
   }
+  /** @type {ThemeChoice} */
   var out = {}
   if (raw && typeof raw === "object" && !Array.isArray(raw))
     MODES.forEach(function(m) { if (isThemeName(raw[m])) out[m] = raw[m] })
@@ -228,7 +236,7 @@ function parseThemeOverrides(saved) {
 /**
  * The theme each mode uses: the saved choice, else ominous.json's (or its default).
  *
- * @param {string|Object|null} saved The themes.json text or object.
+ * @param {*} saved The themes.json text or object; untrusted.
  * @param {Config} cfg The config.
  * @returns {{professional: string, playful: string}}
  */
@@ -456,18 +464,21 @@ function activation(selected, url) {
  * so the card does not change shape as the phase moves.
  *
  * @param {*} rawPalette The theme's `palette`.
- * @param {Object} rawPhases The theme's `phases`.
+ * @param {Object<string, *>} rawPhases The theme's `phases`.
  * @returns {?{palette: Object<string, string>, cols: number, rows: number,
  *     frames: Object<string, string[][]>}} null when there is no sprite or it is malformed.
  */
 function normalizeSprite(rawPalette, rawPhases) {
   if (!rawPalette || typeof rawPalette !== "object" || Array.isArray(rawPalette)) return null
+  /** @type {Object<string, string>} */
   var palette = {}
   for (var key in rawPalette) {
     if (key.length !== 1) return null
     if (typeof rawPalette[key] === "string" && rawPalette[key].length <= 40) palette[key] = rawPalette[key]
   }
-  var cols = 0, rows = 0, frames = {}, any = false
+  /** @type {Object<string, string[][]>} */
+  var frames = {}
+  var cols = 0, rows = 0, any = false
   for (var i = 0; i < PHASES.length; i++) {
     var rawFrames = rawPhases[PHASES[i]] && rawPhases[PHASES[i]].frames
     frames[PHASES[i]] = []
@@ -501,6 +512,7 @@ function normalizeTheme(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
   var rawPhases = raw.phases && typeof raw.phases === "object" ? raw.phases : {}
   var sprite = normalizeSprite(raw.palette, rawPhases)
+  /** @type {Theme} */
   var theme = { progress: raw.progress === true, palette: sprite ? sprite.palette : {},
                 cols: sprite ? sprite.cols : 0, rows: sprite ? sprite.rows : 0, phases: {} }
   PHASES.forEach(function(name) {
@@ -573,9 +585,16 @@ function frameAt(frames, index) {
  * @returns {{name: string, source: string}[]}
  */
 function themeCatalog(userFiles, shippedFiles) {
+  /** @type {Object<string, {user?: boolean, shipped?: boolean}>} */
   var byName = {}
+  /**
+   * Records the theme files of one folder.
+   *
+   * @param {string[]} files File names.
+   * @param {"user"|"shipped"} where Which folder.
+   */
   function add(files, where) {
-    (files || []).forEach(function(f) {
+    (files || []).forEach(function(/** @type {string} */ f) {
       var m = /^(.*)\.json$/.exec(String(f))
       if (!m || !isThemeName(m[1])) return
       byName[m[1]] = byName[m[1]] || {}
@@ -606,6 +625,13 @@ function formatThemeList(catalog, effective) {
   })
   var nameW = Math.max.apply(null, rows.map(function(r) { return r.name.length }))
   var srcW = Math.max.apply(null, rows.map(function(r) { return r.source.length }))
+  /**
+   * Pads a string with spaces to a width.
+   *
+   * @param {string} s The text.
+   * @param {number} w The width.
+   * @returns {string}
+   */
   function pad(s, w) { while (s.length < w) s += " "; return s }
   return rows.map(function(r) {
     var users = MODES.filter(function(m) { return effective[m] === r.name })
@@ -618,17 +644,18 @@ function formatThemeList(catalog, effective) {
  * word, so a theme called "reset" can only be chosen in ominous.json.
  *
  * @param {string} spec "<name> [mode]" or "reset [mode]".
- * @param {Object} overrides The saved choice so far.
+ * @param {ThemeChoice} overrides The saved choice so far.
  * @param {string[]} available The theme names on disk.
  * @param {string} activeMode The mode the card is in.
- * @returns {{error: string}|{overrides: Object, message: string}} The overrides are the new
- *     saved choice.
+ * @returns {{error: string}|{overrides: ThemeChoice, message: string}} The overrides are
+ *     the new saved choice.
  */
 function themeCommand(spec, overrides, available, activeMode) {
   var words = String(spec || "").trim().split(/\s+/).filter(function(w) { return w !== "" })
   if (words.length < 1 || words.length > 2) return { error: THEME_USAGE }
   var mode = words.length === 2 ? words[1] : ""
-  if (mode !== "" && MODES.indexOf(mode) < 0) return { error: THEME_USAGE }
+  if (mode !== "" && /** @type {string[]} */ (MODES).indexOf(mode) < 0) return { error: THEME_USAGE }
+  /** @type {ThemeChoice} */
   var next = {}
   MODES.forEach(function(m) { if (overrides && isThemeName(overrides[m])) next[m] = overrides[m] })
   if (words[0] === "reset") {
@@ -689,8 +716,9 @@ function normalizePayload(p) {
     leadSeconds: isFinite(lead) && lead >= 0 ? lead : DEFAULTS.leadSeconds,
     tenseSeconds: isFinite(tense) && tense >= 0 ? tense : DEFAULTS.tenseSeconds,
     mode: p.mode === "playful" ? "playful" : "professional",
-    themes: { professional: normalizeTheme(themes.professional) || normalizeTheme({}),
-              playful: normalizeTheme(themes.playful) || normalizeTheme({}) }
+    // normalizeTheme({}) is never null: an empty object is a valid, empty theme.
+    themes: { professional: normalizeTheme(themes.professional) || /** @type {Theme} */ (normalizeTheme({})),
+              playful: normalizeTheme(themes.playful) || /** @type {Theme} */ (normalizeTheme({})) }
   }
 }
 
@@ -707,8 +735,8 @@ function normalizePayload(p) {
 function previewPayload(spec, nowMs) {
   var words = String(spec || "").trim().split(/\s+/)
   var phase = words[0]
-  if (PHASES.indexOf(phase) < 0) return { error: "usage: preview <relaxed|tense|angry> [professional|playful] [title...]" }
-  var hasMode = MODES.indexOf(words[1]) >= 0
+  if (/** @type {string[]} */ (PHASES).indexOf(phase) < 0) return { error: "usage: preview <relaxed|tense|angry> [professional|playful] [title...]" }
+  var hasMode = /** @type {string[]} */ (MODES).indexOf(words[1]) >= 0
   var title = words.slice(hasMode ? 2 : 1).join(" ")
   var overrides = {}
   if (hasMode) overrides.mode = words[1]

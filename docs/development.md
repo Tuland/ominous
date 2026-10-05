@@ -4,14 +4,16 @@ Keep the checkout elsewhere and symlink it into `~/.config/omarchy/plugins/io.gi
 After editing QML, run `omarchy restart shell`: an overlay already summoned once keeps its old
 code through `rescanPlugins`.
 
-`mise.toml` pins `node` and `shellcheck`, the tools whose version changes a result; the CI
+`mise.toml` pins `node`, `shellcheck`, `typescript`, `mypy` and `uv` (which installs
+`mypy`), the tools whose version changes a result; the CI
 installs the same versions from it. With [mise](https://mise.jdx.dev) active in your shell,
 run `mise trust` and `mise install` once in the checkout, and every command there uses them.
 Without mise, the tests still run with the system's tools, but a different version may report
 what the CI does not, or the reverse.
 
 Tools used only for development: `node` (unit tests), `python3` (scripts and the character
-generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`) and `shellcheck` (static checks),
+generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc` and `mypy`
+(static checks),
 `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick (`magick`, for
 `preview.png`).
 
@@ -25,7 +27,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`) and `shellcheck` (st
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
-| `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts. |
+| `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts, `tsc` on the JSDoc types of `Logic.js`, `mypy` on the Python. |
 | `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
 | `.claude/skills/ominous-theme/` | The agent skill for drawing and reviewing characters. |
@@ -37,7 +39,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`) and `shellcheck` (st
 ```bash
 tests/run.sh                 # all checks: unit + art check + lint + live against the running shell
 tests/run.sh --unit          # unit + art check + lint; needs no shell
-tools/lint.sh                # lint only: qmllint and shellcheck
+tools/lint.sh                # lint only: qmllint, shellcheck, tsc, mypy
 tests/run.sh --live --restart --keys   # live only, after a QML edit; --keys also types M on the card
 tests/theme-check.sh <dir>   # the card under a light and a dark Omarchy theme, screenshots in <dir>;
                              # puts your Omarchy theme back and proves it
@@ -47,8 +49,10 @@ tests/theme-check.sh <dir>   # the card under a light and a dark Omarchy theme, 
 temporary `qs` link to `/usr/share/omarchy/shell`). Three categories come from how the shell
 and Quickshell describe their own types, so they print as info and never fail:
 `missing-property`, `signal-handler-parameters`, `uncreatable-type`. Any other finding fails.
-Where the shell is not installed, as on GitHub, `qmllint` is skipped with a notice and
-`shellcheck` still runs.
+Where the shell is not installed, as on GitHub, `qmllint` is skipped with a notice and the rest
+still runs. `tsc` (strict) checks a copy of `Logic.js` without its `.pragma library` line, which
+is not JavaScript; `mypy --strict` checks `tools/*.py`. Both come from `mise.toml`, so a
+missing one fails with a hint to run `mise install`.
 
 Every `tests/run.sh` adds a line to `tests/results.log` (not committed): date, commit, results
 and what failed. On GitHub, `.github/workflows/tests.yml` runs `tests/run.sh --unit` on every
@@ -66,7 +70,10 @@ it gives back. A one-line function with a clear name gets one summary line. Comm
 the code are for a why that the code cannot show.
 
 - **JavaScript** (`Logic.js`): JSDoc with types, one `@param` per parameter and `@returns`.
-  Shared shapes are `@typedef`s at the top (`Config`, `AgendaEvent`, `Theme`, `Payload`).
+  Shared shapes are `@typedef`s at the top (`Config`, `AgendaEvent`, `Theme`, `Payload`, `Mode`,
+  `Phase`). The types are checked by `tsc`: make them precise instead of silencing it. Untrusted
+  input (a parsed file or payload) is `*`; an empty object that fills up gets a
+  `/** @type {...} */` line above it.
 
   ```js
   /**
@@ -94,7 +101,8 @@ the code are for a why that the code cannot show.
   and the Google Shell Style Guide block above each function (`Globals:`, `Arguments:`,
   `Outputs:`, `Returns:`, each only when it applies); a one-line function gets one `#` line.
   A check in `tests/live.sh` is described by its `check "..."` line.
-- **Python**: Google style docstrings (`Args:`, `Returns:`) on the module and every function.
+- **Python**: Google style docstrings (`Args:`, `Returns:`) on the module and every function,
+  and type hints everywhere, checked by `mypy --strict`.
 
 ## Drawing the shipped characters
 

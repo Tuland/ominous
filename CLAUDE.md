@@ -50,19 +50,21 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   `manifest.json`.
 - Every function, component and script has a doc comment (JSDoc in `Logic.js` and QML, the
   Google Shell Style Guide in scripts, Google docstrings in Python; see "Code style" in
-  `docs/development.md`). QML functions are typed. `tests/style.test.mjs` checks the comments,
-  `tools/lint.sh` (`qmllint`, `shellcheck`) the rest.
+  `docs/development.md`). QML functions are typed, and so are the JSDoc in `Logic.js` and the
+  Python hints. `tests/style.test.mjs` checks the comments, `tools/lint.sh` (`qmllint`,
+  `shellcheck`, `tsc`, `mypy`) the rest.
 - Commits and pushes wait for the user to ask.
 
 ## Checking a change
 
-`mise.toml` pins `node` and `shellcheck` to the CI's versions. A non-interactive shell does not
+`mise.toml` pins the development tools (`node`, `shellcheck`, `typescript`, `mypy`, `uv`) to the
+CI's versions. A non-interactive shell does not
 run mise's hook, so prefix the checks with `mise exec --` (e.g. `mise exec -- tests/run.sh --unit`).
 
 ```bash
 tests/run.sh                     # everything: unit + art check + lint + live, one history line in tests/results.log
 tests/run.sh --unit              # unit + art check + lint, no shell needed
-tools/lint.sh                    # qmllint (QML, with the shell's modules) and shellcheck (scripts)
+tools/lint.sh                    # qmllint (QML), shellcheck (scripts), tsc (Logic.js types), mypy (Python)
 tests/run.sh --live --restart    # live only, after a QML edit (add --keys to inject M keystrokes)
 tests/theme-check.sh <dir>       # card under a light and a dark Omarchy theme, screenshots in <dir>; restores the theme and proves it
 omarchy restart shell            # QML changes: an already-summoned overlay keeps old code
