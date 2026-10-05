@@ -21,7 +21,9 @@ unit_res="-"; live_res="-"; problems=""; rc=0
 
 if ((UNIT)); then
   echo "== unit"
-  node --test tests/ 2>&1 | tee "$out"
+  # A glob, not a folder: Node before 26 reads a folder argument as a file. The spec reporter
+  # gives the summary lines parsed below on every Node version, terminal or not.
+  node --test --test-reporter=spec 'tests/*.test.mjs' 2>&1 | tee "$out"
   p=$(sed -n 's/^ℹ pass \([0-9]*\).*/\1/p' "$out"); f=$(sed -n 's/^ℹ fail \([0-9]*\).*/\1/p' "$out")
   unit_res="${p:-0}/$(( ${p:-0} + ${f:-1} ))"
   if [[ ${f:-1} != 0 ]]; then rc=1; problems+="unit: $(grep -E '^\s*✖' "$out" | sed 's/([0-9.]*ms)//; s/^\s*✖ //' | head -5 | paste -sd';') "; fi

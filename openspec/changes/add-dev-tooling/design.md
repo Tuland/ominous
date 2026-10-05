@@ -49,7 +49,10 @@ the repository clear of the marketplace scan's "remote code without a pinned com
 - [Pinned actions do not get fixes on their own] → Bump the SHAs when updating; the tag comment
   says which version each one is.
 - [Node 24 on CI, 26 locally] → The tests use only `node:test`, `node:assert`, `node:vm` and
-  `node:fs`, which are stable in both; a run in a clean environment passed.
+  `node:fs`, which are stable in both. The runner itself differs: before Node 26 a folder
+  argument fails and the default reporter off a terminal is TAP, so `tests/run.sh` names the
+  files with a glob and asks for the spec reporter. A clean-environment check uses a Node older
+  than the local one.
 - [The skill goes stale] → It names files and commands that the tests check exist
   (`tests/themes.test.mjs`, `docs/themes.md`); a renamed file shows up as a failing test or a
   missing path.
