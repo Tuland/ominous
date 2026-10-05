@@ -44,6 +44,10 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 - Every change goes through OpenSpec (`openspec new change`, then the artifacts the schema asks
   for, checked with `openspec instructions`). Behavior, config, commands and packaging get spec
   deltas; tooling, tests, CI and agent skills set `skip_specs: true` in `.openspec.yaml`.
+- After archiving a change, add its user-visible items under `## [Unreleased]` in
+  `CHANGELOG.md`, and say whether a release is worth it now and which version. Releases follow
+  the `ominous-release` skill (`.claude/skills/ominous-release/`); the version lives only in
+  `manifest.json`.
 - Commits and pushes wait for the user to ask.
 
 ## Checking a change

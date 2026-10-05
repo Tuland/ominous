@@ -59,13 +59,21 @@ describe("docs", () => {
   })
 })
 
-describe("ominous-theme skill", () => {
-  test("names only files that exist", () => {
-    const skill = read(".claude/skills/ominous-theme/SKILL.md")
-    // Backticked repo paths, e.g. `tools/shoot-card.sh` or `tests/themes.test.mjs`.
-    const paths = [...skill.matchAll(/`((?:tools|tests|docs|themes|openspec|components)\/[\w./-]+?)`/g)]
-      .map((m) => m[1]).filter((p) => !p.includes("<"))
-    assert.ok(paths.length >= 5, "found the paths the skill names")
-    for (const p of paths) assert.ok(exists(p), "the skill names a missing " + p)
+describe("ominous skills", () => {
+  const skills = readdirSync(new URL("../.claude/skills/", import.meta.url)).filter((d) => d.startsWith("ominous-"))
+
+  test("exist", () => {
+    for (const s of ["ominous-theme", "ominous-release"]) assert.ok(skills.includes(s), "skill " + s)
   })
+
+  for (const s of skills) {
+    test(s + " names only files that exist", () => {
+      const skill = read(".claude/skills/" + s + "/SKILL.md")
+      // Backticked repo paths, e.g. `tools/shoot-card.sh` or `tests/themes.test.mjs`.
+      const paths = [...skill.matchAll(/`((?:tools|tests|docs|themes|openspec|components)\/[\w./-]+?)`/g)]
+        .map((m) => m[1]).filter((p) => !p.includes("<"))
+      assert.ok(paths.length >= 5, "found the paths the skill names")
+      for (const p of paths) assert.ok(exists(p), "the skill names a missing " + p)
+    })
+  }
 })

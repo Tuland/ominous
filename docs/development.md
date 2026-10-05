@@ -56,16 +56,19 @@ tools/shoot-card.sh shiba playful angry /tmp/shiba.png   # look at one theme in 
 ## Releasing
 
 The plugin ID, `io.github.tuland.ominous`, is permanent once listed on the
-[Omarchy plugin marketplace](https://plugins.omarchy.org): never change it.
+[Omarchy plugin marketplace](https://plugins.omarchy.org): never change it. An agent follows
+the `ominous-release` skill, which also proposes the version from what changed.
 
-1. Bump `version` in `manifest.json`.
-2. Run `tests/run.sh --restart --keys` and `tests/theme-check.sh <dir>`, and check that the
-   GitHub workflow is green.
-3. If the card looks different, run `tools/make-preview.sh` and look at `preview.png` before
-   committing it. It summons synthetic cards with an opaque veil, so it never captures the
-   desktop.
-4. Tag the commit `vX.Y.Z`, push, and publish a GitHub release for the tag.
-5. The first time only, with the repository public, submit it through the marketplace's
+1. Every user-visible change is listed under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md)
+   (Keep a Changelog). Choose the version with SemVer: fix = patch, addition = minor, a break
+   = major (a minor while in 0.x).
+2. Rename `Unreleased` to the version and date, set the same `version` in `manifest.json`
+   (`tests/packaging.test.mjs` fails if they differ), and run `tests/run.sh --restart`. If
+   the card looks different, also run `tests/theme-check.sh <dir>` and `tools/make-preview.sh`,
+   and look at `preview.png` before committing it.
+3. Commit `Release X.Y.Z`, tag it `vX.Y.Z` (annotated), push the branch and the tag, check that
+   the GitHub workflow is green, and publish a GitHub release with the changelog section.
+4. The first time only, with the repository public, submit it through the marketplace's
    [plugin submission form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml):
    category **Productivity**, tags **quickshell** and **hyprland**. The marketplace reads the
    name, description, version and license from `manifest.json`, and the picture from

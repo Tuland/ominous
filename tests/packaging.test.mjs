@@ -83,3 +83,18 @@ describe("preview image", () => {
     assert.ok(width >= 1600 && height >= 900, `preview.png is ${width}x${height}`)
   })
 })
+
+describe("changelog", () => {
+  const changelog = read("CHANGELOG.md")
+  // Section headings: "## [Unreleased]", then "## [0.2.0] - 2026-10-05", newest first.
+  const released = [...changelog.matchAll(/^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$/gm)].map((m) => m[1])
+
+  test("has an Unreleased section on top", () => {
+    assert.match(changelog, /^## \[Unreleased\]$/m)
+    assert.ok(changelog.indexOf("## [Unreleased]") < changelog.indexOf("## [" + released[0] + "]"), "Unreleased comes first")
+  })
+
+  test("its newest released version is the manifest's", () => {
+    assert.equal(released[0], manifest.version, "CHANGELOG.md has no section for " + manifest.version + " on top")
+  })
+})
