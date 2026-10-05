@@ -5,7 +5,8 @@ After editing QML, run `omarchy restart shell`: an overlay already summoned once
 code through `rescanPlugins`.
 
 Tools used only for development: `node` (unit tests), `python3` (scripts and the character
-generator), `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick (`magick`, for
+generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`) and `shellcheck` (static checks),
+`grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick (`magick`, for
 `preview.png`).
 
 ## Layout
@@ -18,6 +19,7 @@ generator), `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick 
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
+| `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts. |
 | `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
 | `.claude/skills/ominous-theme/` | The agent skill for drawing and reviewing characters. |
@@ -27,12 +29,20 @@ generator), `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick 
 ## Checks
 
 ```bash
-tests/run.sh                 # all checks: unit + art check + live against the running shell
-tests/run.sh --unit          # unit + art check only; needs no shell
+tests/run.sh                 # all checks: unit + art check + lint + live against the running shell
+tests/run.sh --unit          # unit + art check + lint; needs no shell
+tools/lint.sh                # lint only: qmllint and shellcheck
 tests/run.sh --live --restart --keys   # live only, after a QML edit; --keys also types M on the card
 tests/theme-check.sh <dir>   # the card under a light and a dark Omarchy theme, screenshots in <dir>;
                              # puts your Omarchy theme back and proves it
 ```
+
+`tools/lint.sh` runs `qmllint` with the shell's modules on its import path (through a
+temporary `qs` link to `/usr/share/omarchy/shell`). Three categories come from how the shell
+and Quickshell describe their own types, so they print as info and never fail:
+`missing-property`, `signal-handler-parameters`, `uncreatable-type`. Any other finding fails.
+Where the shell is not installed, as on GitHub, `qmllint` is skipped with a notice and
+`shellcheck` still runs.
 
 Every `tests/run.sh` adds a line to `tests/results.log` (not committed): date, commit, results
 and what failed. On GitHub, `.github/workflows/tests.yml` runs `tests/run.sh --unit` on every
@@ -41,6 +51,44 @@ push and pull request; the live checks need a running shell and stay local.
 The live checks use your real session: the card shows up and grabs the keyboard several times.
 They restore the state files and any user theme they touch, and check that `ominous.json` is
 unchanged.
+
+## Code style
+
+Every function, component and script has a doc comment, in the styles of the Google style
+guides; `tests/style.test.mjs` checks they are there. Say what it does, what it takes and what
+it gives back. A one-line function with a clear name gets one summary line. Comments inside
+the code are for a why that the code cannot show.
+
+- **JavaScript** (`Logic.js`): JSDoc with types, one `@param` per parameter and `@returns`.
+  Shared shapes are `@typedef`s at the top (`Config`, `AgendaEvent`, `Theme`, `Payload`).
+
+  ```js
+  /**
+   * What Enter does. Without a link it can only dismiss, whatever is selected.
+   *
+   * @param {number} selected 0 = Join, 1 = Dismiss.
+   * @param {string} url The safe join link, or "".
+   * @returns {string} "join" or "dismiss".
+   */
+  ```
+- **QML**: a `/** */` block above the root object saying what the component is, its `In:`
+  (properties) and `Out:` (signals, or what it writes). Every function has typed parameters
+  and return value, and a JSDoc block without types, since they are in the signature.
+
+  ```qml
+  /**
+   * Opens the overlay with a payload.
+   *
+   * @param payload The payload object.
+   * @returns Whether the shell accepted it.
+   */
+  function summon(payload: var): bool {
+  ```
+- **Bash**: a header comment after the shebang (what the script does and how to call it),
+  and the Google Shell Style Guide block above each function (`Globals:`, `Arguments:`,
+  `Outputs:`, `Returns:`, each only when it applies); a one-line function gets one `#` line.
+  A check in `tests/live.sh` is described by its `check "..."` line.
+- **Python**: Google style docstrings (`Args:`, `Returns:`) on the module and every function.
 
 ## Drawing the shipped characters
 

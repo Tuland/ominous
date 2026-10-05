@@ -8,10 +8,15 @@ import qs.Ui
 import "components"
 import "Logic.js" as Logic
 
-// A large card in the middle of the focused monitor, over a dimmed screen.
-// It stays until dismissed or until the meeting ends: a corner toast is
-// exactly what gets missed. The decisions are in Logic.js; this file wires
-// them to the window, the keys and the state file.
+/**
+ * The alert overlay: a large card in the middle of the focused monitor, over a dimmed
+ * screen. It stays until dismissed or until the meeting ends: a corner toast is exactly what
+ * gets missed. The decisions are in Logic.js; this file wires them to the window, the keys
+ * and the state file.
+ *
+ * In: `shell` and `manifest` from the plugin host; a payload through open().
+ * Out: hides itself through `shell.hide`; writes the mode to ~/.local/state/ominous/state.json.
+ */
 Item {
   id: root
 
@@ -62,10 +67,14 @@ Item {
   property real spriteReserve: sprite.hasArt ? root.theme.cols * root.cell + Style.space(24) : 0
   Behavior on spriteReserve { enabled: root.opened; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-  // The theme's color for a phase (a palette role or hex), else the default:
-  // accent, accent tinted toward urgent, urgent. The Omarchy palette has no
-  // warning role, and a blend stays coherent with every theme.
-  function phaseColor(name) {
+  /**
+   * The theme's color for a phase (a palette role or hex), else the default: accent, accent
+   * tinted toward urgent, urgent. The Omarchy palette has no warning role, and a blend stays
+   * coherent with every theme.
+   *
+   * @param name "relaxed", "tense" or "angry".
+   */
+  function phaseColor(name: string): color {
     var fallback = name === "relaxed" ? Color.accent
                  : name === "tense" ? Qt.tint(Color.accent, Util.alpha(Color.urgent, 0.5))
                  : Color.urgent
@@ -80,7 +89,12 @@ Item {
 
   // ---- Entry points (the shell calls open/close; the card calls the rest)
 
-  function open(payloadJson) {
+  /**
+   * Shows the card for a payload. Called by the shell's summon.
+   *
+   * @param payloadJson The payload as JSON; anything unreadable gets defaults.
+   */
+  function open(payloadJson: string): void {
     var raw = null
     try { raw = JSON.parse(payloadJson || "{}") } catch (e) { raw = null }
     var p = Logic.normalizePayload(raw)
@@ -108,34 +122,39 @@ Item {
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
-  function close() {
+  /** Hides the card. Called by the shell. */
+  function close(): void {
     root.opened = false
   }
 
-  function dismiss() {
+  /** Hides the card and tells the shell the overlay is done. */
+  function dismiss(): void {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide((root.manifest && root.manifest.id) || "io.github.tuland.ominous")
   }
 
-  function join() {
+  /** Opens the join link in the browser, then dismisses. Does nothing without a link. */
+  function join(): void {
     if (root.url === "") return
     Quickshell.execDetached(["omarchy-launch-browser", root.url])
     root.dismiss()
   }
 
-  function activate() {
+  /** What Enter does: join or dismiss, by the selection (see Logic.activation). */
+  function activate(): void {
     if (Logic.activation(root.selected, root.url) === "join") root.join()
     else root.dismiss()
   }
 
-  // Restyles the open card at once and remembers the choice for later alerts.
-  function toggleMode() {
+  /** Restyles the open card at once and remembers the choice for later alerts. */
+  function toggleMode(): void {
     root.mode = root.mode === "playful" ? "professional" : "playful"
     saveDir.running = true
   }
 
-  function formatTime(ms) { return Qt.formatTime(new Date(ms), "HH:mm") }
+  /** A time as HH:mm. */
+  function formatTime(ms: real): string { return Qt.formatTime(new Date(ms), "HH:mm") }
 
   // ---- The mode's state file: the service watches it, this overlay is its
   // only writer. `ominous.json` is never touched.

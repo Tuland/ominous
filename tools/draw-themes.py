@@ -21,26 +21,53 @@ THEMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "the
 
 
 def blank():
+    """Returns an empty N x N grid, every cell transparent (".")."""
     return [["."] * N for _ in range(N)]
 
 
 def put(g, pts, c):
+    """Paints single pixels, skipping any outside the grid.
+
+    Args:
+        g: The grid, changed in place.
+        pts: (x, y) pairs.
+        c: The palette character to paint.
+    """
     for x, y in pts:
         if 0 <= x < N and 0 <= y < N:
             g[y][x] = c
 
 
 def rect(g, x0, y0, x1, y1, c):
+    """Fills a rectangle, corners included.
+
+    Args:
+        g: The grid, changed in place.
+        x0: Left column.
+        y0: Top row.
+        x1: Right column.
+        y1: Bottom row.
+        c: The palette character to paint.
+    """
     put(g, [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)], c)
 
 
 def rows(g):
+    """Returns the grid as text rows, the form a theme file stores."""
     return ["".join(r) for r in g]
 
 
 # ---------------------------------------------------------------- marine
 def marine(mood, variant=0):
-    """mood: relaxed | tense | angry. variant picks the animation frame."""
+    """Draws the marine: a soldier in a helmet.
+
+    Args:
+        mood: "relaxed", "tense" or "angry".
+        variant: The animation frame of that mood.
+
+    Returns:
+        The frame as text rows.
+    """
     g = blank()
     angry = mood == "angry"
     skin, shade = ("z", "Z") if angry else ("s", "S")
@@ -108,6 +135,15 @@ MARINE = {
 
 # ---------------------------------------------------------------- shiba
 def shiba(mood, variant=0):
+    """Draws the shiba, the dog of the doge meme style.
+
+    Args:
+        mood: "relaxed", "tense" or "angry".
+        variant: The animation frame of that mood.
+
+    Returns:
+        The frame as text rows.
+    """
     g = blank()
     angry = mood == "angry"
     fur = "q" if angry else "o"
@@ -181,6 +217,15 @@ SHIBA = {
 
 # ---------------------------------------------------------------- boss
 def boss(mood, variant=0):
+    """Draws the boss: an executive in suit and tie.
+
+    Args:
+        mood: "relaxed", "tense" or "angry".
+        variant: The animation frame of that mood.
+
+    Returns:
+        The frame as text rows.
+    """
     g = blank()
     angry = mood == "angry"
     skin, shade = ("z", "Z") if angry else ("s", "S")
@@ -258,11 +303,29 @@ THEMES = {"marine": MARINE, "shiba": SHIBA, "boss": BOSS}
 
 
 def render(theme):
-    # one frame row per line keeps the art readable and the diffs small
+    """Serializes a theme as its file's text.
+
+    One frame row per line keeps the art readable and the diffs small.
+
+    Args:
+        theme: The theme as a dict.
+
+    Returns:
+        The JSON text, with a final newline.
+    """
     return json.dumps(theme, indent=2).replace('",\n          "', '", "') + "\n"
 
 
 def main(args):
+    """Writes, shows or checks the themes.
+
+    Args:
+        args: [] to write the files, ["--show"] to also print every frame, ["--check"] to
+            only compare the files with the drawing.
+
+    Returns:
+        The exit status: 0, 1 when --check finds a difference, 2 on bad arguments.
+    """
     if args not in ([], ["--show"], ["--check"]):
         print(__doc__)
         return 2

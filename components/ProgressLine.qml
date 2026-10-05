@@ -1,9 +1,14 @@
 import QtQuick
 import qs.Commons
 
-// A thin bar: a faint track and a fill of `fraction` (0..1) in `fillColor`.
-// With `animated` the fill moves linearly over one 250 ms clock tick, so it
-// looks continuous; turn it off while a card opens so it does not sweep in.
+/**
+ * A thin bar: a faint track and a fill of `fraction` in `fillColor`. With `animated` the fill
+ * moves linearly over one 250 ms clock tick, so it looks continuous; turn it off while a card
+ * opens so it does not sweep in.
+ *
+ * In: `fraction` (0..1), `fillColor`, `trackColor`, `animated`.
+ * Out: nothing; it only draws.
+ */
 Rectangle {
   id: line
 

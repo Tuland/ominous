@@ -21,9 +21,16 @@ LIGHT="Catppuccin Latte"; DARK="Gruvbox"
 SNAP=$(mktemp -d)
 
 SHOOT=$(dirname "$0")/../tools/shoot-card.sh
+# Closes the card.
 hide() { omarchy-shell -q shell hide "$ID"; }
 
-# Everything a theme change could touch, as stable text.
+#######################################
+# Describes everything a theme change could touch, as stable text.
+# Globals:
+#   CUR, HOME
+# Outputs:
+#   One line per file hash, link target or gsettings value.
+#######################################
 manifest() {
   echo "theme.name: $(cat "$CUR/theme.name" 2>/dev/null)"
   echo "current: $(omarchy-theme-current 2>/dev/null)"
@@ -40,7 +47,12 @@ manifest() {
   for k in color-scheme gtk-theme icon-theme; do echo "gsettings $k $(gsettings get org.gnome.desktop.interface $k 2>/dev/null)"; done
 }
 
-apply_palette() {   # what omarchy-theme-set sends the running shell
+#######################################
+# Hands the current theme's palette to the running shell, as omarchy-theme-set does.
+# Globals:
+#   CUR
+#######################################
+apply_palette() {
   local c="" s=""
   [[ -f $CUR/theme/colors.toml ]] && c=$(base64 -w 0 "$CUR/theme/colors.toml")
   [[ -f $CUR/theme/shell.toml ]] && s=$(base64 -w 0 "$CUR/theme/shell.toml")
@@ -55,6 +67,16 @@ ORIGINAL=$(omarchy-theme-current)
 echo "saved: $ORIGINAL ($(wc -l < "$SNAP/before.txt") manifest lines) -> $SNAP"
 
 restored=0
+#######################################
+# Puts the saved theme back, re-applies its palette and compares the manifest. Runs once, on
+# exit.
+# Globals:
+#   SNAP, CUR, ORIGINAL, restored
+# Outputs:
+#   PASS, or FAIL with the differences.
+# Returns:
+#   Exits 1 when anything differs.
+#######################################
 restore() {
   ((restored)) && return; restored=1
   hide
@@ -73,7 +95,15 @@ restore() {
 trap 'restore' EXIT
 trap 'exit 130' INT TERM
 
-shoot() {   # label, theme, mode, phase
+#######################################
+# Photographs one card through tools/shoot-card.sh.
+# Globals:
+#   SHOOT, OUT
+# Arguments:
+#   The picture's name, without .png.
+#   The playful theme, the mode and the phase.
+#######################################
+shoot() {
   "$SHOOT" "$2" "$3" "$4" "$OUT/$1.png" "Weekly sync" >/dev/null && echo "shot $1.png" || echo "FAIL shot $1"
 }
 

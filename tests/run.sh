@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every check in one command, with a history line per run in tests/results.log.
-#   tests/run.sh                  unit (node --test, themes vs tools/draw-themes.py) + live (needs the running shell)
+#   tests/run.sh                  unit (node --test, themes vs tools/draw-themes.py, tools/lint.sh) + live (needs the running shell)
 #   tests/run.sh --unit           unit only; needs no shell
 #   tests/run.sh --live           live only
 #   tests/run.sh --restart --keys  passed on to tests/live.sh (see its header)
@@ -33,6 +33,8 @@ if ((UNIT)); then
   echo "== art"
   # The playful themes are drawn by tools/draw-themes.py; their JSON must match it.
   if ! tools/draw-themes.py --check; then rc=1; problems+="art: themes differ from tools/draw-themes.py "; fi
+  echo "== lint"
+  if ! tools/lint.sh; then rc=1; problems+="lint: tools/lint.sh found problems "; fi
 fi
 
 if ((LIVE)); then

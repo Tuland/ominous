@@ -1,10 +1,14 @@
 import QtQuick
-import qs.Commons
 import "../Logic.js" as Logic
 
-// A theme's character for the current phase: cycles the phase's frames, jolts
-// once when the meeting starts (if the theme asks), and fades out when the phase
-// has no art, still showing its last frame instead of vanishing mid-fade.
+/**
+ * A theme's character for the current phase: cycles the phase's frames, jolts once when the
+ * meeting starts (if the theme asks), and fades out when the phase has no art, still showing
+ * its last frame instead of vanishing mid-fade.
+ *
+ * In: `theme` (normalized), `phase`, `running` (the card is open), `cell` (pixel size).
+ * Out: `hasArt`, for the card to make room; reset() and maybeShake() for the card to call.
+ */
 Item {
   id: sprite
 
@@ -28,14 +32,15 @@ Item {
   onPhaseChanged: { sprite.frameIndex = 0; sprite.maybeShake() }
   onThemeChanged: sprite.frameIndex = 0
 
-  // For a card that just opened: start from the first frame, no leftover jolt.
-  function reset() {
+  /** For a card that just opened: start from the first frame, no leftover jolt. */
+  function reset(): void {
     shake.stop()
     sprite.shakeX = 0
     sprite.frameIndex = 0
   }
 
-  function maybeShake() {
+  /** Jolts once, if the card is open, angry, and the theme asks for it. */
+  function maybeShake(): void {
     if (sprite.running && sprite.phase === "angry" && sprite.hasArt && sprite.spec.shake) shake.restart()
   }
 
@@ -59,7 +64,7 @@ Item {
     x: sprite.shakeX
     cols: sprite.shown.cols
     rows: sprite.shown.rows
-    palette: sprite.shown.palette
+    colors: sprite.shown.palette
     grid: sprite.shown.grid
     cell: sprite.cell
     opacity: sprite.hasArt ? 1 : 0

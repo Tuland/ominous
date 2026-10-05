@@ -48,13 +48,18 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   `CHANGELOG.md`, and say whether a release is worth it now and which version. Releases follow
   the `ominous-release` skill (`.claude/skills/ominous-release/`); the version lives only in
   `manifest.json`.
+- Every function, component and script has a doc comment (JSDoc in `Logic.js` and QML, the
+  Google Shell Style Guide in scripts, Google docstrings in Python; see "Code style" in
+  `docs/development.md`). QML functions are typed. `tests/style.test.mjs` checks the comments,
+  `tools/lint.sh` (`qmllint`, `shellcheck`) the rest.
 - Commits and pushes wait for the user to ask.
 
 ## Checking a change
 
 ```bash
-tests/run.sh                     # everything: unit + art check + live, one history line in tests/results.log
-tests/run.sh --unit              # unit + art check, no shell needed
+tests/run.sh                     # everything: unit + art check + lint + live, one history line in tests/results.log
+tests/run.sh --unit              # unit + art check + lint, no shell needed
+tools/lint.sh                    # qmllint (QML, with the shell's modules) and shellcheck (scripts)
 tests/run.sh --live --restart    # live only, after a QML edit (add --keys to inject M keystrokes)
 tests/theme-check.sh <dir>       # card under a light and a dark Omarchy theme, screenshots in <dir>; restores the theme and proves it
 omarchy restart shell            # QML changes: an already-summoned overlay keeps old code

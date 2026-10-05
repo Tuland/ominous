@@ -1,8 +1,13 @@
 import QtQuick
 import qs.Commons
 
-// One of the card's two buttons. `current` is the keyboard selection; clicks are
-// ignored while `guarded` (the card's first second).
+/**
+ * One of the card's two buttons.
+ *
+ * In: `label`; `current`, the keyboard selection; `guarded`, true during the card's first
+ * second, when clicks are ignored; the colors.
+ * Out: `activated()` on a click that is not guarded.
+ */
 Rectangle {
   id: btn
 

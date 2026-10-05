@@ -5,9 +5,15 @@ import Qt.labs.folderlistmodel
 import "components"
 import "Logic.js" as Logic
 
-// Polls OmaCal's offline agenda and summons the Alert overlay when a meeting
-// enters its alert window. No calendar access of its own: OmaCal has already
-// synced everything into its database, and `omacal agenda --json` reads it.
+/**
+ * The background service: polls OmaCal's offline agenda and summons the Alert overlay when a
+ * meeting enters its alert window. No calendar access of its own: OmaCal has already synced
+ * everything into its database, and `omacal agenda --json` reads it.
+ *
+ * In: `shell`, `manifest` and `pluginRegistry` from the plugin host; ominous.json, the state
+ * files and the theme folders, all watched.
+ * Out: `shell.summon` calls; the IPC target `ominous`; writes only themes.json.
+ */
 Item {
   id: root
 
@@ -41,26 +47,48 @@ Item {
   property string lastError: ""
   property real lastFetchMs: 0
 
-  function log(msg) { console.log("ominous: " + msg) }
+  /** Writes a line to the shell's log, prefixed with "ominous:". */
+  function log(msg: string): void { console.log("ominous: " + msg) }
 
-  function loadConfig(text) {
+  /**
+   * Applies ominous.json's text; broken JSON keeps the defaults and logs why.
+   *
+   * @param text The file's content.
+   */
+  function loadConfig(text: string): void {
     var r = Logic.parseConfig(text)
     if (r.error) root.log(r.error)
     root.config = r.config
   }
 
-  // What every alert carries besides the meeting: timing, dimming and the look.
-  // Both themes travel with it so the card's switch can flip modes without a
-  // round trip to this service.
-  function withLook(p) {
+  /**
+   * Adds what every alert carries besides the meeting: timing, dimming and the look. Both
+   * themes travel with it so the card's switch can flip modes without a round trip to this
+   * service.
+   *
+   * @param p The meeting part of a payload; changed in place.
+   * @returns The same object.
+   */
+  function withLook(p: var): var {
     var look = Logic.look(root.config, root.mode, { professional: professionalTheme.theme, playful: playfulTheme.theme })
     for (var k in look) p[k] = look[k]
     return p
   }
 
-  function payloadFor(ev) { return root.withLook(Logic.eventPayload(ev)) }
+  /**
+   * The full payload for an agenda event.
+   *
+   * @param ev The event.
+   */
+  function payloadFor(ev: var): var { return root.withLook(Logic.eventPayload(ev)) }
 
-  function summon(payload) {
+  /**
+   * Opens the overlay with a payload.
+   *
+   * @param payload The payload object.
+   * @returns Whether the shell accepted it.
+   */
+  function summon(payload: var): bool {
     if (!root.shell || typeof root.shell.summon !== "function") {
       root.log("shell cannot summon overlays")
       return false
@@ -68,13 +96,15 @@ Item {
     return root.shell.summon(root.pluginId, JSON.stringify(payload)) === true
   }
 
-  function tick() {
+  /** Alerts for the next due event, if any. Runs every 5 s. */
+  function tick(): void {
     var ev = Logic.claimDue(root.events, Date.now(), root.config, root.fired)
     if (!ev) return
     root.log("alert for event " + ev.eventId + (root.summon(root.payloadFor(ev)) ? "" : " (summon failed)"))
   }
 
-  function prune() { Logic.pruneFired(root.fired, Date.now()) }
+  /** Forgets alerts older than a day. */
+  function prune(): void { Logic.pruneFired(root.fired, Date.now()) }
 
   FileView {
     path: root.configPath
@@ -135,13 +165,20 @@ Item {
     showDirs: false
   }
 
-  function fileNames(model) {
+  /**
+   * The file names a folder model lists.
+   *
+   * @param model A FolderListModel.
+   * @returns The names, as a list of strings.
+   */
+  function fileNames(model: var): var {
     var out = []
     for (var i = 0; i < model.count; i++) out.push(model.get(i, "fileName"))
     return out
   }
 
-  function themeCatalog() { return Logic.themeCatalog(root.fileNames(userThemeFiles), root.fileNames(shippedThemeFiles)) }
+  /** The themes on disk (see Logic.themeCatalog). */
+  function themeCatalog(): var { return Logic.themeCatalog(root.fileNames(userThemeFiles), root.fileNames(shippedThemeFiles)) }
 
   ThemeSlot {
     id: professionalTheme
@@ -208,7 +245,7 @@ Item {
   IpcHandler {
     target: "ominous"
 
-    // Synthetic meeting 60 s out, no calendar needed.
+    /** IPC: a synthetic meeting 60 s out, no calendar needed. */
     function test(): string {
       var now = Date.now()
       return root.summon(root.withLook({ title: "Ominous test meeting", startMs: now + 60000, endMs: now + 30 * 60000,
@@ -216,10 +253,13 @@ Item {
                                          url: "https://meet.google.com/" })) ? "ok" : "failed"
     }
 
-    // A synthetic alert that lands in (and stays in) one phase, for looking at a
-    // theme: `preview "angry playful"`. The spec is `<phase> [mode] [title...]`;
-    // without a mode the active one is used (and nothing is saved), and a long
-    // title is how to check that text fits.
+    /**
+     * IPC: holds the card in one phase, to look at a theme: `preview "angry playful"`. Without a
+     * mode the active one is used (and nothing is saved), and a long title is how to check that
+     * text fits.
+     *
+     * @param spec "<phase> [mode] [title...]".
+     */
     function preview(spec: string): string {
       var r = Logic.previewPayload(spec, Date.now())
       if (r.error) return r.error
@@ -228,13 +268,18 @@ Item {
       return root.summon(p) ? "ok" : "failed"
     }
 
-    // Every theme on disk, where it comes from, and which mode uses it.
+    /** IPC: every theme on disk, where it comes from, and which mode uses it. */
     function themes(): string {
       return Logic.formatThemeList(root.themeCatalog(), root.themeNames)
     }
 
-    // `theme "shiba"`, `theme "marine professional"`, `theme "reset [mode]"`.
-    // Saved to themes.json, never to ominous.json; applies from the next alert.
+    /**
+     * IPC: chooses a theme, e.g. `theme "shiba"`, `theme "marine professional"`,
+     * `theme "reset [mode]"`. Saved to themes.json, never to ominous.json; applies from the
+     * next alert.
+     *
+     * @param spec "<name> [mode]" or "reset [mode]".
+     */
     function theme(spec: string): string {
       var names = root.themeCatalog().map(function(t) { return t.name })
       var r = Logic.themeCommand(spec, Logic.parseThemeOverrides(root.themesStateText), names, root.mode)
@@ -245,7 +290,7 @@ Item {
       return r.message
     }
 
-    // Counts and times only, never titles.
+    /** IPC: the config, counts and times, and the last error; never titles. */
     function status(): string {
       var s = Logic.statusSnapshot(root.events, root.config, Date.now())
       return JSON.stringify({

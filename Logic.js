@@ -37,24 +37,103 @@ var DEFAULT_FRAME_MS = 500
 
 var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset [professional|playful]"'
 
+/**
+ * @typedef {Object} Config  ominous.json after normalizeConfig; every field has its default.
+ * @property {string[]} calendars  Lowercased calendar names or ids; empty = every calendar.
+ * @property {number} leadSeconds  How long before the start the card appears.
+ * @property {?number} dim  Veil opacity 0..1, or null for the theme's.
+ * @property {number} tenseSeconds  How long before the start the card turns tense.
+ * @property {string} mode  "professional" or "playful".
+ * @property {{professional: string, playful: string}} themes  Theme name per mode.
+ * @property {boolean} onlyWithLink  Alert only for meetings with an https join link.
+ *
+ * @typedef {Object} AgendaEvent  One event of `omacal agenda --json` (untrusted input).
+ * @property {string} eventId
+ * @property {number} startMs
+ * @property {number} endMs
+ * @property {string} title
+ * @property {string} location
+ * @property {string} calendar
+ * @property {string} calendarId
+ * @property {string} conference  The join link, if any.
+ * @property {boolean} allDay
+ * @property {string} response  The user's answer, e.g. "declined".
+ *
+ * @typedef {Object} PhaseLook  One phase of a theme.
+ * @property {string} color  A color token, or "" for the card's default.
+ * @property {string} caption
+ * @property {string[][]} frames  Sprite frames, each a list of text rows.
+ * @property {number} frameMs
+ * @property {boolean} shake
+ *
+ * @typedef {Object} Theme  A theme file after normalizeTheme.
+ * @property {boolean} progress  Whether the card shows the progress line.
+ * @property {Object<string, string>} palette  One character to a color token.
+ * @property {number} cols
+ * @property {number} rows
+ * @property {{relaxed: PhaseLook, tense: PhaseLook, angry: PhaseLook}} phases
+ *
+ * @typedef {Object} ThemeFileState  What a watched theme file holds right now.
+ * @property {string} status  "loading", "ok", "missing" or "invalid".
+ * @property {?Theme} theme
+ *
+ * @typedef {Object} Payload  What the overlay shows, after normalizePayload.
+ * @property {string} title
+ * @property {number} startMs
+ * @property {number} endMs
+ * @property {string} location
+ * @property {string} calendar
+ * @property {string} url  An https link, or "".
+ * @property {?number} dim
+ * @property {number} leadSeconds
+ * @property {number} tenseSeconds
+ * @property {string} mode
+ * @property {{professional: Theme, playful: Theme}} themes
+ */
+
 // ---------------------------------------------------------------- Values and links
 
-// null, "" and booleans must not read as 0: a 0 tenseSeconds would silently drop the tense phase.
+/**
+ * A number from a config or payload value. null, "" and booleans must not read as 0: a 0
+ * tenseSeconds would silently drop the tense phase.
+ *
+ * @param {*} v Any value.
+ * @returns {number} The number, or NaN for anything that is not a number or a numeric string.
+ */
 function numberOrNaN(v) {
   return typeof v === "number" || (typeof v === "string" && v.trim() !== "") ? Number(v) : NaN
 }
 
-// Theme names end up in a file path, so only a plain slug is accepted.
+/**
+ * Whether a string is a valid theme name. Theme names end up in a file path, so only a plain
+ * slug is accepted.
+ *
+ * @param {*} name The candidate name.
+ * @returns {boolean}
+ */
 function isThemeName(name) {
   return typeof name === "string" && /^[a-z0-9_-]{1,40}$/.test(name)
 }
 
-// Calendar data is third-party input: only a plain https URL is ever opened.
+/**
+ * The link the card may open. Calendar data is third-party input: only a plain https URL is
+ * ever opened.
+ *
+ * @param {*} url The link from the calendar or a payload.
+ * @returns {string} The URL, or "" when it is not a plain https URL.
+ */
 function safeUrl(url) {
   var s = String(url || "")
   return /^https:\/\/[^\s\\]+$/i.test(s) ? s : ""
 }
 
+/**
+ * The name of the meeting service behind a link, for the Join button.
+ *
+ * @param {*} url The join link.
+ * @returns {string} "Meet", "Teams", "Zoom", "Webex", "Jitsi" or "Whereby"; "browser" for
+ *     another https link; "" when there is no safe link.
+ */
 function provider(url) {
   var m = /^https:\/\/([^\/:?#]+)/i.exec(safeUrl(url))
   if (!m) return ""
@@ -68,6 +147,13 @@ function provider(url) {
 
 // ---------------------------------------------------------------- Config and saved state
 
+/**
+ * Cleans a parsed ominous.json: every known key with a valid value is kept, everything else
+ * gets its default.
+ *
+ * @param {*} raw The parsed file, or anything else.
+ * @returns {Config}
+ */
 function normalizeConfig(raw) {
   var cfg = {
     calendars: DEFAULTS.calendars.slice(), leadSeconds: DEFAULTS.leadSeconds, dim: DEFAULTS.dim,
@@ -92,15 +178,27 @@ function normalizeConfig(raw) {
   return cfg
 }
 
-// Reads ominous.json's text. A missing file (empty text) is fine; broken JSON gives defaults and an error.
+/**
+ * Reads ominous.json's text. A missing file (empty text) is fine; broken JSON gives defaults
+ * and an error.
+ *
+ * @param {string} text The file's content.
+ * @returns {{config: Config, error: string}} The error is "" when the file parsed.
+ */
 function parseConfig(text) {
   var raw = null, error = ""
   try { raw = JSON.parse(text || "{}") } catch (e) { error = "config parse failed, using defaults" }
   return { config: normalizeConfig(raw), error: error }
 }
 
-// The mode saved by the switch wins over the config's. `stateRaw` is the state
-// file's text (or an already parsed object); anything unreadable is ignored.
+/**
+ * The mode in use. The mode saved by the switch wins over the config's; anything unreadable
+ * is ignored.
+ *
+ * @param {string|Object|null} stateRaw The state file's text, or an already parsed object.
+ * @param {Config} cfg The config.
+ * @returns {string} "professional" or "playful".
+ */
 function resolveMode(stateRaw, cfg) {
   var st = stateRaw
   if (typeof st === "string") {
@@ -109,8 +207,13 @@ function resolveMode(stateRaw, cfg) {
   return st && typeof st === "object" && MODES.indexOf(st.mode) >= 0 ? st.mode : cfg.mode
 }
 
-// The theme per mode saved by the `theme` command (text or parsed); anything
-// unreadable counts as no choice.
+/**
+ * The theme per mode saved by the `theme` command. Anything unreadable counts as no choice.
+ *
+ * @param {string|Object|null} saved The themes.json text, or an already parsed object.
+ * @returns {{professional: (string|undefined), playful: (string|undefined)}} Only the modes
+ *     with a valid saved name.
+ */
 function parseThemeOverrides(saved) {
   var raw = saved
   if (typeof raw === "string") {
@@ -122,7 +225,13 @@ function parseThemeOverrides(saved) {
   return out
 }
 
-// The theme each mode uses: the saved choice, else ominous.json's (or its default).
+/**
+ * The theme each mode uses: the saved choice, else ominous.json's (or its default).
+ *
+ * @param {string|Object|null} saved The themes.json text or object.
+ * @param {Config} cfg The config.
+ * @returns {{professional: string, playful: string}}
+ */
 function resolveThemes(saved, cfg) {
   var o = parseThemeOverrides(saved)
   return { professional: o.professional || cfg.themes.professional, playful: o.playful || cfg.themes.playful }
@@ -130,6 +239,14 @@ function resolveThemes(saved, cfg) {
 
 // ---------------------------------------------------------------- Agenda
 
+/**
+ * Whether an agenda event may raise an alert: timed, not declined, in a configured calendar,
+ * and with a join link when `onlyWithLink` is set.
+ *
+ * @param {?AgendaEvent} ev The event.
+ * @param {Config} cfg The config.
+ * @returns {boolean}
+ */
 function isAlertable(ev, cfg) {
   if (!ev || ev.allDay || ev.response === "declined") return false
   if (!(Number(ev.startMs) > 0)) return false
@@ -141,12 +258,25 @@ function isAlertable(ev, cfg) {
   return cfg.calendars.indexOf(name) >= 0 || cfg.calendars.indexOf(id) >= 0
 }
 
+/**
+ * The key that remembers an alert: the event and its start, so a moved meeting alerts again.
+ *
+ * @param {AgendaEvent} ev The event.
+ * @returns {string}
+ */
 function eventKey(ev) {
   return String(ev.eventId) + ":" + String(ev.startMs)
 }
 
-// The earliest alertable event inside its alert window that has not fired yet,
-// or null.
+/**
+ * The earliest alertable event inside its alert window that has not fired yet.
+ *
+ * @param {AgendaEvent[]} events The agenda.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {Config} cfg The config.
+ * @param {Object<string, number>} fired Keys of the alerts already shown.
+ * @returns {?AgendaEvent} The event, or null.
+ */
 function nextDue(events, nowMs, cfg, fired) {
   var best = null
   for (var i = 0; i < (events || []).length; i++) {
@@ -159,14 +289,29 @@ function nextDue(events, nowMs, cfg, fired) {
   return best
 }
 
-// The next event to alert for, marked in `fired` so it alerts once even though it stays in its window.
+/**
+ * The next event to alert for, marked in `fired` so it alerts once even though it stays in
+ * its window.
+ *
+ * @param {AgendaEvent[]} events The agenda.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {Config} cfg The config.
+ * @param {Object<string, number>} fired Keys of the alerts already shown; updated in place.
+ * @returns {?AgendaEvent} The event, or null.
+ */
 function claimDue(events, nowMs, cfg, fired) {
   var ev = nextDue(events, nowMs, cfg, fired)
   if (ev) fired[eventKey(ev)] = Number(ev.startMs)
   return ev
 }
 
-// Forgets alerts older than a day, in place.
+/**
+ * Forgets alerts older than a day, in place.
+ *
+ * @param {Object<string, number>} fired Alert keys to their start, epoch milliseconds.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {Object<string, number>} The same object.
+ */
 function pruneFired(fired, nowMs) {
   var cutoff = nowMs - 24 * 3600 * 1000
   for (var k in fired)
@@ -174,7 +319,15 @@ function pruneFired(fired, nowMs) {
   return fired
 }
 
-// What the `status` IPC says about the agenda: counts and times, never titles.
+/**
+ * What the `status` IPC says about the agenda: counts and times, never titles.
+ *
+ * @param {AgendaEvent[]} events The agenda.
+ * @param {Config} cfg The config.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {{events: number, upcomingAlertable: number, nextStart: ?string}} nextStart is an
+ *     ISO time, or null.
+ */
 function statusSnapshot(events, cfg, nowMs) {
   var starts = (events || []).filter(function(ev) { return isAlertable(ev, cfg) && Number(ev.startMs) > nowMs })
                              .map(function(ev) { return Number(ev.startMs) })
@@ -184,8 +337,15 @@ function statusSnapshot(events, cfg, nowMs) {
 
 // ---------------------------------------------------------------- Timing on the card
 
-// "relaxed" until `tenseSeconds` before the start, "tense" until the start,
-// "angry" from then on. A missing start never leaves "relaxed".
+/**
+ * Which phase the card is in: "relaxed" until `tenseSeconds` before the start, "tense" until
+ * the start, "angry" from then on. A missing start never leaves "relaxed".
+ *
+ * @param {number} startMs Meeting start, epoch milliseconds.
+ * @param {number} nowMs The moment to classify, epoch milliseconds.
+ * @param {number} tenseSeconds How long before the start the card turns tense.
+ * @returns {string} "relaxed", "tense" or "angry".
+ */
 function phase(startMs, nowMs, tenseSeconds) {
   var start = Number(startMs)
   if (!(start > 0)) return "relaxed"
@@ -193,8 +353,16 @@ function phase(startMs, nowMs, tenseSeconds) {
   return nowMs >= start - tenseSeconds * 1000 ? "tense" : "relaxed"
 }
 
-// Bar fill, 0..1: before the start the share of the lead time already elapsed,
-// after it the share of the meeting already gone. No end time or no lead = full.
+/**
+ * The progress line's fill: before the start the share of the lead time already elapsed,
+ * after it the share of the meeting already gone. No end time or no lead = full.
+ *
+ * @param {number} startMs Meeting start, epoch milliseconds.
+ * @param {number} endMs Meeting end, epoch milliseconds, or 0.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {number} leadSeconds How long before the start the card appears.
+ * @returns {number} 0..1.
+ */
 function progress(startMs, endMs, nowMs, leadSeconds) {
   var start = Number(startMs), end = Number(endMs), lead = leadSeconds * 1000
   var f
@@ -203,8 +371,14 @@ function progress(startMs, endMs, nowMs, leadSeconds) {
   return isFinite(f) ? Math.min(1, Math.max(0, f)) : 0
 }
 
-// "in 0:42", "now", "started 1:05 ago". Minutes are not capped at 59 because
-// the lead time can be up to an hour.
+/**
+ * The countdown text: "in 0:42", "now", "started 1:05 ago". Minutes are not capped at 59
+ * because the lead time can be up to an hour.
+ *
+ * @param {number} startMs Meeting start, epoch milliseconds.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {string}
+ */
 function countdown(startMs, nowMs) {
   var diff = Math.round((Number(startMs) - nowMs) / 1000)
   if (diff === 0) return "now"
@@ -213,41 +387,79 @@ function countdown(startMs, nowMs) {
   return diff > 0 ? "in " + text : "started " + text + " ago"
 }
 
-// The card closes by itself when the meeting is over.
+/**
+ * Whether the meeting is over, so the card closes by itself.
+ *
+ * @param {number} endMs Meeting end, epoch milliseconds, or 0 when unknown.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {boolean}
+ */
 function isOver(endMs, nowMs) {
   return endMs > 0 && nowMs >= endMs
 }
 
 // ---------------------------------------------------------------- Card input
 
-// Keys and clicks right after the card appears are swallowed: it grabs focus
-// mid-typing, and an Enter already on its way must not join a meeting that has
-// not been read yet.
+/**
+ * Whether input is still swallowed. Keys and clicks right after the card appears are
+ * ignored: it grabs focus mid-typing, and an Enter already on its way must not join a
+ * meeting that has not been read yet.
+ *
+ * @param {number} openedAtMs When the card opened, epoch milliseconds.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {number} guardMs How long input is ignored.
+ * @returns {boolean}
+ */
 function isGuarded(openedAtMs, nowMs, guardMs) {
   return nowMs - openedAtMs < guardMs
 }
 
-// Buttons: 0 = Join, 1 = Dismiss. Join is only ever the default when there is a link.
+/**
+ * The button selected when the card opens. Join is only ever the default when there is a
+ * link.
+ *
+ * @param {string} url The safe join link, or "".
+ * @returns {number} 0 = Join, 1 = Dismiss.
+ */
 function initialSelection(url) {
   return url !== "" ? 0 : 1
 }
 
-// Left, Right and Tab flip between the buttons, if there are two.
+/**
+ * The button selected after Left, Right or Tab: they flip between the buttons, if there are
+ * two.
+ *
+ * @param {number} selected 0 = Join, 1 = Dismiss.
+ * @param {string} url The safe join link, or "".
+ * @returns {number}
+ */
 function nextSelection(selected, url) {
   return url !== "" ? 1 - selected : selected
 }
 
-// What Enter does. Without a link it can only dismiss, whatever is selected.
+/**
+ * What Enter does. Without a link it can only dismiss, whatever is selected.
+ *
+ * @param {number} selected 0 = Join, 1 = Dismiss.
+ * @param {string} url The safe join link, or "".
+ * @returns {string} "join" or "dismiss".
+ */
 function activation(selected, url) {
   return selected === 0 && url !== "" ? "join" : "dismiss"
 }
 
 // ---------------------------------------------------------------- Themes
 
-// A sprite is a palette (one character -> color token) plus, per phase, frames
-// of equal-length text rows. Returns { palette, cols, rows, frames: {phase: [...]} }
-// or null when there is no sprite or it is malformed. Every frame of every
-// phase shares one size, so the card does not change shape as the phase moves.
+/**
+ * Checks a theme's pixel art. A sprite is a palette (one character to a color token) plus,
+ * per phase, frames of equal-length text rows. Every frame of every phase shares one size,
+ * so the card does not change shape as the phase moves.
+ *
+ * @param {*} rawPalette The theme's `palette`.
+ * @param {Object} rawPhases The theme's `phases`.
+ * @returns {?{palette: Object<string, string>, cols: number, rows: number,
+ *     frames: Object<string, string[][]>}} null when there is no sprite or it is malformed.
+ */
 function normalizeSprite(rawPalette, rawPhases) {
   if (!rawPalette || typeof rawPalette !== "object" || Array.isArray(rawPalette)) return null
   var palette = {}
@@ -277,9 +489,14 @@ function normalizeSprite(rawPalette, rawPhases) {
   return any ? { palette: palette, cols: cols, rows: rows, frames: frames } : null
 }
 
-// Cleans a parsed theme file. Returns null if it is not an object. A bad
-// sprite is dropped on its own; colors, captions and the rest still apply.
-// Missing colors stay "" for the overlay to fill in with its per-phase defaults.
+/**
+ * Cleans a parsed theme file. A bad sprite is dropped on its own; colors, captions and the
+ * rest still apply. Missing colors stay "" for the overlay to fill in with its per-phase
+ * defaults.
+ *
+ * @param {*} raw The parsed file.
+ * @returns {?Theme} null if it is not an object.
+ */
 function normalizeTheme(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
   var rawPhases = raw.phases && typeof raw.phases === "object" ? raw.phases : {}
@@ -303,12 +520,19 @@ function normalizeTheme(raw) {
   return theme
 }
 
-// Picks the theme to use from the three files a mode watches: the user's
-// `<name>.json`, the plugin's `<name>.json` and the plugin's default for the
-// mode. Each is { status: "loading" | "ok" | "missing" | "invalid", theme }.
-// Returns { theme, error, pending }; a theme that is absent or broken falls
-// back to the mode's default and says so in `error`, and the alert never waits
-// on a theme (the last resort is an empty theme: plain defaults).
+/**
+ * Picks the theme to use from the three files a mode watches: the user's `<name>.json`, the
+ * plugin's `<name>.json` and the plugin's default for the mode. A theme that is absent or
+ * broken falls back to the mode's default and says so in `error`, and the alert never waits
+ * on a theme (the last resort is an empty theme: plain defaults).
+ *
+ * @param {string} name The theme name asked for.
+ * @param {ThemeFileState} user The user's file.
+ * @param {ThemeFileState} shipped The plugin's file of that name.
+ * @param {ThemeFileState} fallback The plugin's default for the mode.
+ * @returns {{theme: ?Theme, error: string, pending: boolean}} pending while a file that
+ *     decides is still loading.
+ */
 function pickTheme(name, user, shipped, fallback) {
   var error = ""
   if (user.status === "ok") return { theme: user.theme, error: "", pending: false }
@@ -325,7 +549,13 @@ function pickTheme(name, user, shipped, fallback) {
   return { theme: normalizeTheme({}), error: error + "; default theme unavailable", pending: false }
 }
 
-// The sprite frame to draw; the index may run past the end.
+/**
+ * The sprite frame to draw; the index may run past the end, or below zero.
+ *
+ * @param {string[][]} frames The phase's frames.
+ * @param {number} index The frame counter.
+ * @returns {?string[]} The frame's rows, or null when there are no frames.
+ */
 function frameAt(frames, index) {
   return frames && frames.length > 0 ? frames[((index % frames.length) + frames.length) % frames.length] : null
 }
@@ -334,8 +564,14 @@ function frameAt(frames, index) {
 // `themes` lists, `theme "<name> [mode]"` chooses, `theme reset` forgets. The
 // choice is saved in its own state file, which only the service writes.
 
-// The themes on disk by name, sorted. A user file wins over a shipped one of the
-// same name. Files whose name is not a valid theme name are left out.
+/**
+ * The themes on disk by name, sorted. A user file wins over a shipped one of the same name.
+ * Files whose name is not a valid theme name are left out.
+ *
+ * @param {string[]} userFiles File names in the user's themes folder.
+ * @param {string[]} shippedFiles File names in the plugin's themes folder.
+ * @returns {{name: string, source: string}[]}
+ */
 function themeCatalog(userFiles, shippedFiles) {
   var byName = {}
   function add(files, where) {
@@ -354,8 +590,14 @@ function themeCatalog(userFiles, shippedFiles) {
   })
 }
 
-// The text `themes` prints: one line per theme, where it comes from, which mode uses it.
-// A theme a mode asks for but that is not on disk is listed too, as missing.
+/**
+ * The text `themes` prints: one line per theme, where it comes from, which mode uses it. A
+ * theme a mode asks for but that is not on disk is listed too, as missing.
+ *
+ * @param {{name: string, source: string}[]} catalog From themeCatalog.
+ * @param {{professional: string, playful: string}} effective The theme each mode uses.
+ * @returns {string}
+ */
 function formatThemeList(catalog, effective) {
   var rows = catalog.map(function(t) { return { name: t.name, source: t.source } })
   MODES.forEach(function(m) {
@@ -371,9 +613,17 @@ function formatThemeList(catalog, effective) {
   }).join("\n")
 }
 
-// What `theme "<spec>"` means. Returns { error } or { overrides, message }, where
-// the overrides are the new saved choice. Without a mode a theme goes to playful.
-// `reset` is the command word, so a theme called "reset" can only be chosen in ominous.json.
+/**
+ * What `theme "<spec>"` means. Without a mode a theme goes to playful. `reset` is the command
+ * word, so a theme called "reset" can only be chosen in ominous.json.
+ *
+ * @param {string} spec "<name> [mode]" or "reset [mode]".
+ * @param {Object} overrides The saved choice so far.
+ * @param {string[]} available The theme names on disk.
+ * @param {string} activeMode The mode the card is in.
+ * @returns {{error: string}|{overrides: Object, message: string}} The overrides are the new
+ *     saved choice.
+ */
 function themeCommand(spec, overrides, available, activeMode) {
   var words = String(spec || "").trim().split(/\s+/).filter(function(w) { return w !== "" })
   if (words.length < 1 || words.length > 2) return { error: THEME_USAGE }
@@ -398,19 +648,36 @@ function themeCommand(spec, overrides, available, activeMode) {
 // ---------------------------------------------------------------- Payloads
 // What travels from Service.qml to Alert.qml through the shell's summon.
 
-// The meeting part of a payload, from an OmaCal agenda event.
+/**
+ * The meeting part of a payload, from an OmaCal agenda event.
+ *
+ * @param {AgendaEvent} ev The event.
+ * @returns {Object} title, startMs, endMs, location, calendar and a safe url.
+ */
 function eventPayload(ev) {
   return { title: String(ev.title || "Meeting"), startMs: Number(ev.startMs), endMs: Number(ev.endMs) || 0,
            location: String(ev.location || ""), calendar: String(ev.calendar || ""), url: safeUrl(ev.conference) }
 }
 
-// The look part: timing, dimming, the mode and both themes (already normalized).
+/**
+ * The look part of a payload: timing, dimming, the mode and both themes (already normalized).
+ *
+ * @param {Config} cfg The config.
+ * @param {string} mode The mode in use.
+ * @param {{professional: Theme, playful: Theme}} themes The theme of each mode.
+ * @returns {Object}
+ */
 function look(cfg, mode, themes) {
   return { dim: cfg.dim, leadSeconds: cfg.leadSeconds, tenseSeconds: cfg.tenseSeconds, mode: mode, themes: themes }
 }
 
-// What the overlay makes of a payload. Anyone who can call the shell's IPC can
-// summon it, so every field is checked again and a bad one gets its default.
+/**
+ * What the overlay makes of a payload. Anyone who can call the shell's IPC can summon it, so
+ * every field is checked again and a bad one gets its default.
+ *
+ * @param {*} p The parsed payload.
+ * @returns {Payload}
+ */
 function normalizePayload(p) {
   p = p && typeof p === "object" ? p : {}
   var lead = numberOrNaN(p.leadSeconds), tense = numberOrNaN(p.tenseSeconds)
@@ -427,11 +694,16 @@ function normalizePayload(p) {
   }
 }
 
-// `preview "<phase> [mode] [title...]"`: a synthetic meeting that lands in one
-// phase and stays there. Returns { error } or { payload, overrides }, where the
-// overrides (mode, leadSeconds, tenseSeconds) replace the look's own. Relaxed
-// and tense start ten minutes out, and tense stretches its threshold to cover
-// them, so the phase holds instead of lasting only tenseSeconds.
+/**
+ * The synthetic meeting of `preview "<phase> [mode] [title...]"`, which lands in one phase and
+ * stays there. Relaxed and tense start ten minutes out, and tense stretches its threshold to
+ * cover them, so the phase holds instead of lasting only tenseSeconds.
+ *
+ * @param {string} spec The command's argument.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {{error: string}|{payload: Object, overrides: Object}} The overrides (mode,
+ *     leadSeconds, tenseSeconds) replace the look's own.
+ */
 function previewPayload(spec, nowMs) {
   var words = String(spec || "").trim().split(/\s+/)
   var phase = words[0]

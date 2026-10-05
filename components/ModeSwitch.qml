@@ -2,9 +2,14 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// The professional/playful switch. Quiet on purpose: faint until the pointer is
-// on it, its label shows only then, and it is not in the card's Tab cycle, so it
-// can never be what Enter confirms.
+/**
+ * The professional/playful switch. Quiet on purpose: faint until the pointer is on it, its
+ * label shows only then, and it is not in the card's Tab cycle, so it can never be what Enter
+ * confirms.
+ *
+ * In: `checked` (playful); the colors.
+ * Out: `toggled()` on a click.
+ */
 Row {
   id: control
 

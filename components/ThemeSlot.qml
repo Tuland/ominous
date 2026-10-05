@@ -1,9 +1,14 @@
 import QtQuick
 import "../Logic.js" as Logic
 
-// The theme one mode uses: the user's `<name>.json`, else the plugin's, else the
-// mode's default (see Logic.pickTheme). All three files stay watched, so adding
-// or fixing a theme takes effect without a restart.
+/**
+ * The theme one mode uses: the user's `<name>.json`, else the plugin's, else the mode's
+ * default (see Logic.pickTheme). All three files stay watched, so adding or fixing a theme
+ * takes effect without a restart.
+ *
+ * In: `mode`, `name`, `userDir`, `shippedDir`.
+ * Out: `theme` (never null) and `picked` (with the error, if any).
+ */
 Item {
   id: slot
 
@@ -20,8 +25,8 @@ Item {
   // While nothing has loaded yet, plain defaults rather than nothing.
   readonly property var theme: slot.picked.theme || Logic.normalizeTheme({})
 
-  // The user's folder may only exist after the service has created it.
-  function reloadUserFile() { userFile.reload() }
+  /** Reads the user's file again: the folder may only exist after the service has created it. */
+  function reloadUserFile(): void { userFile.reload() }
 
   ThemeFile { id: userFile; path: slot.userDir + "/" + slot.name + ".json" }
   ThemeFile { id: shippedFile; path: slot.shippedDir + "/" + slot.name + ".json" }

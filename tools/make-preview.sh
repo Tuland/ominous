@@ -16,12 +16,23 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 for tool in magick fc-match; do command -v $tool >/dev/null || { echo "missing: $tool"; exit 1; }; done
 font=$(fc-match -f '%{file}' monospace)
-# The veil behind the card is the theme's background at full opacity, so the canvas uses it too.
+# Prints one color ($1, e.g. background) of the current Omarchy theme.
 color() { sed -n "s/^$1 *= *\"\(#[0-9a-fA-F]*\)\".*/\1/p" "$HOME/.local/state/omarchy/current/theme/colors.toml" | head -1; }
 fg=$(color foreground); fg=${fg:-#c0caf5}
+# The veil behind the card is the theme's background at full opacity, so the canvas uses it too.
 bg=$(color background); bg=${bg:-#1a1b26}
 
-# name, mode, phase, playful theme, caption -> $TMP/<name>-cell.png, a 960x540 quarter
+#######################################
+# Makes one quarter of the picture: the card centred on the theme's background, with a caption.
+# Globals:
+#   TMP, bg, fg, font
+# Arguments:
+#   The cell's name, the mode, the phase, the playful theme and the caption.
+# Outputs:
+#   Writes $TMP/<name>-cell.png, 960x540.
+# Returns:
+#   1 if the card could not be photographed.
+#######################################
 cell() {
   tools/shoot-card.sh "$4" "$2" "$3" "$TMP/$1.png" >/dev/null || return 1
   magick "$TMP/$1.png" -filter Lanczos -resize 840x400 "$TMP/$1.png"

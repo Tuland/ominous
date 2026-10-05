@@ -23,25 +23,47 @@ THEMES=$HOME/.config/omarchy/ominous/themes
 ID=io.github.tuland.ominous
 
 pass=0; fail=0; failed=()
+#######################################
+# Runs one check and records the result.
+# Globals:
+#   pass, fail, failed
+# Arguments:
+#   The check's description.
+#   The command and its arguments; its output is discarded.
+# Outputs:
+#   PASS or FAIL with the description.
+#######################################
 check() {
   local name=$1; shift
   if "$@" >/dev/null 2>&1; then echo "PASS $name"; pass=$((pass + 1)); else echo "FAIL $name"; fail=$((fail + 1)); failed+=("$name"); fi
 }
 
+# Closes the card.
 hide() { omarchy-shell -q shell hide "$ID"; }
+# Prints one expression ($1, Python, over the status JSON as `d`).
 jsonget() { omarchy-shell ominous status | python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
-settle() { sleep 1.6; }   # file watchers need a moment
+# Waits for the file watchers to notice a change.
+settle() { sleep 1.6; }
+# Retries a command ($2...) every 0.2 s, up to $1 times; 1 if it never succeeds.
 wait_for() { local n=$1; shift; local i; for ((i = 0; i < n; i++)); do "$@" && return 0; sleep 0.2; done; return 1; }
+# Whether the shell answers on the ominous IPC target.
 status_ok() { omarchy-shell ominous status >/dev/null 2>&1; }
+# Whether the card's layer is on screen.
 overlay_open() {
   hyprctl layers -j | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any(l["namespace"]=="ominous-alert" for v in d.values() for ls in v["levels"].values() for l in ls) else 1)'
 }
+# Whether the card's layer is gone.
 overlay_closed() { ! overlay_open; }
 
 BK=$(mktemp -d)
 [[ -f $STATE ]] && cp -p "$STATE" "$BK/state.json"
 [[ -f $THEME_CHOICE ]] && cp -p "$THEME_CHOICE" "$BK/themes.json"
 [[ -f $THEMES/marine.json ]] && cp -p "$THEMES/marine.json" "$BK/marine.json"
+#######################################
+# Puts the user's state files and theme back as they were, and closes the card.
+# Globals:
+#   STATE, THEME_CHOICE, THEMES, BK
+#######################################
 cleanup() {
   hide
   rm -f "$THEMES/marine.json" "$STATE" "$THEME_CHOICE"
@@ -74,7 +96,9 @@ no_title_in_status() {
 check "status never prints a meeting title" no_title_in_status
 
 # ---- saved mode
+# Whether the service reports mode $1.
 mode_is() { [[ $(jsonget "d['mode']") == "$1" ]]; }
+# Prints the mode ominous.json asks for.
 cfg_mode() { jsonget "d['config']['mode']"; }
 state_playful() { mkdir -p "$STATE_DIR"; echo '{"mode":"playful"}' > "$STATE"; settle; mode_is playful; }
 state_garbage() { echo 'garbage' > "$STATE"; settle; mode_is "$(cfg_mode)"; }
@@ -84,6 +108,7 @@ check "a garbage state file falls back to the config mode" state_garbage
 check "deleting the state file falls back to the config mode" state_removed
 
 # ---- user themes
+# Prints the service's theme error, empty when none.
 theme_err() { jsonget "d['themeError']"; }
 mkdir -p "$THEMES"
 theme_valid() { echo '{"progress":true}' > "$THEMES/marine.json"; settle; [[ -z $(theme_err) ]]; }
@@ -103,6 +128,7 @@ check "removing the user theme falls back to the shipped one" theme_removed
 
 # ---- theme commands
 rm -f "$THEME_CHOICE"; settle
+# Whether the playful mode uses theme $1.
 playful_is() { [[ $(jsonget "d['themes']['playful']") == "$1" ]]; }
 lists_shipped() {
   local out; out=$(omarchy-shell ominous themes)
