@@ -17,4 +17,4 @@
 
 ## 4. Release 0.2.0
 
-- [ ] 4.1 Commit, then move the local `v0.2.0` tag to that commit (not pushed yet), following the skill. Verify `git tag --points-at HEAD` shows `v0.2.0` and `v0.1.0` still points at the first release commit
+- [x] 4.1 Commit, then move the local `v0.2.0` tag to that commit (not pushed yet), following the skill. Verify `git tag --points-at HEAD` shows `v0.2.0` and `v0.1.0` still points at the first release commit
