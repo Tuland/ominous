@@ -14,4 +14,4 @@
 ## 3. Notes and checks
 
 - [x] 3.1 `docs/development.md` (code style, tools, checks) and `CLAUDE.md`: the type checks. Verify the docs tests pass
-- [ ] 3.2 `mise exec -- tests/run.sh --unit` passes; after the push, the CI is green
+- [x] 3.2 `mise exec -- tests/run.sh --unit` passes; after the push, the CI is green
