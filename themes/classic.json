@@ -1,0 +1,7 @@
+{
+  "progress": true,
+  "phases": {
+    "relaxed": { "color": "accent" },
+    "angry": { "color": "urgent" }
+  }
+}

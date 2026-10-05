@@ -1,0 +1,55 @@
+{
+  "progress": false,
+  "palette": {
+    ".": "transparent",
+    "k": "#241713",
+    "o": "#e08a3c",
+    "q": "#e2552f",
+    "c": "#f6e7c8",
+    "i": "#e9959a",
+    "w": "#ffffff",
+    "m": "#6e2a2a",
+    "r": "urgent",
+    "b": "accent"
+  },
+  "phases": {
+    "relaxed": {
+      "color": "accent",
+      "caption": "such calm. very agenda.",
+      "frames": [
+        [
+          "................", "..k..........k..", "..kk........kk..", "..kik......kik..", "...kokkkkkkok...", "..kocoooooocok..", ".kooooooooooook.", ".koookooookoook.", ".kookokookokook.", ".kooocckkccoook.", ".koocckcckccook.", ".kooccckkcccook.", "..koccccccccok..", "...kkcccccckk...", ".....kkkkkk.....", "................"
+        ]
+      ]
+    },
+    "tense": {
+      "caption": "much soon. wow.",
+      "frameMs": 900,
+      "frames": [
+        [
+          "................", "..k..........k..", "..kk........kk..", "..kik......kik..", "...kokkkbkkok...", "..kocoooboocok..", ".koowwwoowwwook.", ".kookwwookwwook.", ".koowwwoowwwook.", ".kooocckkccoook.", ".kooccccccccook.", ".koocckcckccook.", "..koccckkcccok..", "...kkcccccckk...", ".....kkkkkk.....", "................"
+        ],
+        [
+          "................", "..k..........k..", "..kk........kk..", "..kik......kik..", "...kokkkkkkok...", "..kocoooboocok..", ".koowwwobwwwook.", ".koowwkoowwkook.", ".koowwwoowwwook.", ".kooocckkccoook.", ".kooccccccccook.", ".koocckcckccook.", "..koccckkcccok..", "...kkcccccckk...", ".....kkkkkk.....", "................"
+        ]
+      ]
+    },
+    "angry": {
+      "color": "urgent",
+      "caption": "very late. so meeting.",
+      "frameMs": 250,
+      "shake": true,
+      "frames": [
+        [
+          "................", "................", ".k............k.", ".kik........kik.", "..kqkkkkkkkkqk..", "..kqcqqqqqqcqk..", ".kqkkqqqqqqkkqk.", ".kqqqkkqqkkqqqk.", ".kqqkrkqqkrkqqk.", ".kqqqcckkccqqqk.", ".kqqckkkkkkcqqk.", ".kqqckwmmwkcqqk.", "..kqccwccwccqk..", "...kkcccccckk...", ".....kkkkkk.....", "................"
+        ],
+        [
+          "................", "................", ".k............k.", ".kik........kik.", "..kqkkkkkkkkqk..", "..kqcqqqqqqcqk..", ".kqkkqqqqqqkkqk.", ".kqqqkkqqkkqqqk.", ".kqqkrkqqkrkqqk.", ".kqqqcckkccqqqk.", ".kqqckwkkwkcqqk.", ".kqqckmmmmkcqqk.", "..kqckmrrmkcqk..", "...kkkkkkkkkk...", ".....kkkkkk.....", "................"
+        ],
+        [
+          "................", "................", ".k............k.", ".kik........kik.", "..kqkkkkkkkkqk..", "..kqcqqqqqqcqk..", ".kqkkqqqqqqkkqk.", "kkqqqkkqqkkqqqkk", ".kqqkrkqqkrkqqk.", "kkqqqcckkccqqqkk", ".kqqckkkkkkcqqk.", ".kqqckwmmwkcqqk.", "..kqccwccwccqk..", "...kkcccccckk...", ".....kkkkkk.....", "................"
+        ]
+      ]
+    }
+  }
+}

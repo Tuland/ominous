@@ -1,6 +1,8 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import Qt.labs.folderlistmodel
+import "components"
 import "Logic.js" as Logic
 
 // Polls OmaCal's offline agenda and summons the Alert overlay when a meeting
@@ -17,7 +19,20 @@ Item {
   readonly property string pluginId: (root.manifest && root.manifest.id) || "tuland.ominous"
   readonly property string configPath: Quickshell.env("HOME") + "/.config/omarchy/ominous.json"
 
+  readonly property string userThemesDir: Quickshell.env("HOME") + "/.config/omarchy/ominous/themes"
+  readonly property string shippedThemesDir: decodeURIComponent(Qt.resolvedUrl("themes").toString().replace(/^file:\/\//, ""))
+  // The overlay writes the mode here when the card's switch is toggled; this
+  // side only reads it, so there is exactly one writer.
+  readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/ominous"
+
   property var config: Logic.normalizeConfig(null)
+  property string stateText: ""
+  readonly property string mode: Logic.resolveMode(root.stateText, root.config)
+  // The `theme` command's choice (themes.json, written only here) over ominous.json's.
+  property string themesStateText: ""
+  readonly property var themeNames: Logic.resolveThemes(root.themesStateText, root.config)
+  readonly property string themeError: [professionalTheme.picked.error, playfulTheme.picked.error]
+                                         .filter(function(e) { return e !== "" }).join("; ")
   property var events: []
   // eventKey -> startMs, so a meeting alerts once even though it stays in its
   // window for several ticks. Lost on shell restart, which at worst repeats an
@@ -29,22 +44,21 @@ Item {
   function log(msg) { console.log("ominous: " + msg) }
 
   function loadConfig(text) {
-    var raw = null
-    try { raw = JSON.parse(text || "{}") } catch (e) { root.log("config parse failed, using defaults") }
-    root.config = Logic.normalizeConfig(raw)
+    var r = Logic.parseConfig(text)
+    if (r.error) root.log(r.error)
+    root.config = r.config
   }
 
-  function payloadFor(ev) {
-    return {
-      title: String(ev.title || "Meeting"),
-      startMs: Number(ev.startMs),
-      endMs: Number(ev.endMs) || 0,
-      location: String(ev.location || ""),
-      calendar: String(ev.calendar || ""),
-      url: Logic.safeUrl(ev.conference),
-      dim: root.config.dim
-    }
+  // What every alert carries besides the meeting: timing, dimming and the look.
+  // Both themes travel with it so the card's switch can flip modes without a
+  // round trip to this service.
+  function withLook(p) {
+    var look = Logic.look(root.config, root.mode, { professional: professionalTheme.theme, playful: playfulTheme.theme })
+    for (var k in look) p[k] = look[k]
+    return p
   }
+
+  function payloadFor(ev) { return root.withLook(Logic.eventPayload(ev)) }
 
   function summon(payload) {
     if (!root.shell || typeof root.shell.summon !== "function") {
@@ -55,18 +69,12 @@ Item {
   }
 
   function tick() {
-    var now = Date.now()
-    var ev = Logic.nextDue(root.events, now, root.config, root.fired)
+    var ev = Logic.claimDue(root.events, Date.now(), root.config, root.fired)
     if (!ev) return
-    root.fired[Logic.eventKey(ev)] = Number(ev.startMs)
     root.log("alert for event " + ev.eventId + (root.summon(root.payloadFor(ev)) ? "" : " (summon failed)"))
   }
 
-  function prune() {
-    var cutoff = Date.now() - 24 * 3600 * 1000
-    for (var k in root.fired)
-      if (root.fired[k] < cutoff) delete root.fired[k]
-  }
+  function prune() { Logic.pruneFired(root.fired, Date.now()) }
 
   FileView {
     path: root.configPath
@@ -76,6 +84,82 @@ Item {
     onLoaded: root.loadConfig(text())
     onLoadFailed: root.loadConfig("")
   }
+
+  // A file can only be watched once its directory exists, so create the state
+  // and the user themes directories up front and load their files after.
+  Process {
+    command: ["mkdir", "-p", root.stateDir, root.userThemesDir]
+    running: true
+    onExited: {
+      stateFile.reload()
+      themesFile.reload()
+      professionalTheme.reloadUserFile()
+      playfulTheme.reloadUserFile()
+    }
+  }
+
+  FileView {
+    id: stateFile
+    path: root.stateDir + "/state.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.stateText = text()
+    onLoadFailed: root.stateText = ""
+  }
+
+  FileView {
+    id: themesFile
+    path: root.stateDir + "/themes.json"
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.themesStateText = text()
+    onLoadFailed: root.themesStateText = ""
+    onSaveFailed: root.log("could not save the theme choice")
+  }
+
+  // Both theme folders, kept current by the models themselves, for `themes` and `theme`.
+  FolderListModel {
+    id: userThemeFiles
+    folder: "file://" + encodeURI(root.userThemesDir)
+    nameFilters: ["*.json"]
+    showDirs: false
+  }
+
+  FolderListModel {
+    id: shippedThemeFiles
+    folder: Qt.resolvedUrl("themes")
+    nameFilters: ["*.json"]
+    showDirs: false
+  }
+
+  function fileNames(model) {
+    var out = []
+    for (var i = 0; i < model.count; i++) out.push(model.get(i, "fileName"))
+    return out
+  }
+
+  function themeCatalog() { return Logic.themeCatalog(root.fileNames(userThemeFiles), root.fileNames(shippedThemeFiles)) }
+
+  ThemeSlot {
+    id: professionalTheme
+    mode: "professional"
+    name: root.themeNames.professional
+    userDir: root.userThemesDir
+    shippedDir: root.shippedThemesDir
+  }
+
+  ThemeSlot {
+    id: playfulTheme
+    mode: "playful"
+    name: root.themeNames.playful
+    userDir: root.userThemesDir
+    shippedDir: root.shippedThemesDir
+  }
+
+  onThemeErrorChanged: if (root.themeError !== "") root.log(root.themeError)
 
   Process {
     id: agenda
@@ -127,20 +211,51 @@ Item {
     // Synthetic meeting 60 s out, no calendar needed.
     function test(): string {
       var now = Date.now()
-      return root.summon({ title: "Ominous test meeting", startMs: now + 60000, endMs: now + 30 * 60000,
-                           location: "Nowhere in particular", calendar: "test",
-                           url: "https://meet.google.com/", dim: root.config.dim }) ? "ok" : "failed"
+      return root.summon(root.withLook({ title: "Ominous test meeting", startMs: now + 60000, endMs: now + 30 * 60000,
+                                         location: "Nowhere in particular", calendar: "test",
+                                         url: "https://meet.google.com/" })) ? "ok" : "failed"
+    }
+
+    // A synthetic alert that lands in (and stays in) one phase, for looking at a
+    // theme: `preview "angry playful"`. The spec is `<phase> [mode] [title...]`;
+    // without a mode the active one is used (and nothing is saved), and a long
+    // title is how to check that text fits.
+    function preview(spec: string): string {
+      var r = Logic.previewPayload(spec, Date.now())
+      if (r.error) return r.error
+      var p = root.withLook(r.payload)
+      for (var k in r.overrides) p[k] = r.overrides[k]
+      return root.summon(p) ? "ok" : "failed"
+    }
+
+    // Every theme on disk, where it comes from, and which mode uses it.
+    function themes(): string {
+      return Logic.formatThemeList(root.themeCatalog(), root.themeNames)
+    }
+
+    // `theme "shiba"`, `theme "marine professional"`, `theme "reset [mode]"`.
+    // Saved to themes.json, never to ominous.json; applies from the next alert.
+    function theme(spec: string): string {
+      var names = root.themeCatalog().map(function(t) { return t.name })
+      var r = Logic.themeCommand(spec, Logic.parseThemeOverrides(root.themesStateText), names, root.mode)
+      if (r.error) return r.error
+      var text = JSON.stringify(r.overrides) + "\n"
+      root.themesStateText = text   // takes effect now; the file catches up
+      themesFile.setText(text)
+      return r.message
     }
 
     // Counts and times only, never titles.
     function status(): string {
-      var now = Date.now()
-      var alertable = root.events.filter(function(ev) { return Logic.isAlertable(ev, root.config) && Number(ev.startMs) > now })
+      var s = Logic.statusSnapshot(root.events, root.config, Date.now())
       return JSON.stringify({
         config: root.config,
-        events: root.events.length,
-        upcomingAlertable: alertable.length,
-        nextStart: alertable.length ? new Date(Math.min.apply(null, alertable.map(function(e) { return Number(e.startMs) }))).toISOString() : null,
+        mode: root.mode,
+        themes: root.themeNames,
+        themeError: root.themeError,
+        events: s.events,
+        upcomingAlertable: s.upcomingAlertable,
+        nextStart: s.nextStart,
         lastFetch: root.lastFetchMs ? new Date(root.lastFetchMs).toISOString() : null,
         lastError: root.lastError
       })

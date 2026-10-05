@@ -1,0 +1,59 @@
+{
+  "progress": false,
+  "palette": {
+    ".": "transparent",
+    "k": "#1b1511",
+    "h": "#55703c",
+    "H": "#7c9a58",
+    "g": "#3c5230",
+    "s": "#d9a273",
+    "S": "#b98456",
+    "z": "#d9694a",
+    "Z": "#b4503a",
+    "w": "#f4efe6",
+    "t": "#f4efe6",
+    "m": "#8a3b34",
+    "r": "urgent",
+    "b": "accent"
+  },
+  "phases": {
+    "relaxed": {
+      "color": "accent",
+      "caption": "All clear.",
+      "frames": [
+        [
+          "................", "....kkkkkkkk....", "...khHHHHhhhk...", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kggggggggggk..", "..kskkksskkksk..", "..kswkwsswkwsk..", "..kSwkwsswkwSk..", "..kSssssssssSk..", "..kSsssSSsssSk..", "..kSsmssssmsSk..", "..kSssmmmmssSk..", "...kssssssssk...", "....kkkkkkkk....", "................"
+        ]
+      ]
+    },
+    "tense": {
+      "caption": "Incoming.",
+      "frameMs": 900,
+      "frames": [
+        [
+          "................", "....kkkkkkkk....", "...khHHHHhhhk...", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kgkkkggkkkgkb.", "..kswwwsswwwskb.", "..kskwwsskwwskbb", "..kSkwwsskwwSk..", "..kSssssssssSk..", "..kSsssSSsssSk..", "..kSssssssssSk..", "..kSssmmmmssSk..", "...kssssssssk...", "....kkkkkkkk....", "................"
+        ],
+        [
+          "................", "....kkkkkkkk....", "...khHHHHhhhk...", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kgkkkggkkkgk..", "..kswwwsswwwskb.", "..kswwksswwkskb.", "..kSwwksswwkSkbb", "..kSssssssssSk..", "..kSsssSSsssSk..", "..kSssssssssSk..", "..kSssmmmmssSk..", "...kssssssssk...", "....kkkkkkkk....", "................"
+        ]
+      ]
+    },
+    "angry": {
+      "color": "urgent",
+      "caption": "YOU ARE LATE.",
+      "frameMs": 250,
+      "shake": true,
+      "frames": [
+        [
+          ".............r.r", "....kkkkkkkk..r.", "...khHHHHhhhkr.r", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kggggggggggk..", "..kzkkzzzzkkzk..", "..kzzzkzzkzzzk..", "..kZwrwzzwrwZk..", "..kZzzzzzzzzZk..", "..kZzzzZZzzzZk..", "..kZzkkkkkkzZk..", "..kZztkttktzZk..", "...kzkkkkkkzk...", "....kkkkkkkk....", "................"
+        ],
+        [
+          ".............r.r", "....kkkkkkkk..r.", "...khHHHHhhhkr.r", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kggggggggggk..", "..kzkkzzzzkkzk..", "..kzzzkzzkzzzk..", "..kZwrwzzwrwZk..", "..kZzzzzzzzzZk..", "..kZzkkkkkkzZk..", "..kZzktmmtkzZk..", "..kZzkmrrmkzZk..", "...kzkkkkkkzk...", "....kkkkkkkk....", "................"
+        ],
+        [
+          "................", "....kkkkkkkk....", "...khHHHHhhhk...", "..khHHHhhhhhhk..", "..khhhhhhhhhhk..", "..kggggggggggk..", "..kzkkzzzzkkzk..", "..kzzzkzzkzzzk..", "..kZwrwzzwrwZk..", "..kZzzzzzzzzZk..", "..kZzzzZZzzzZk..", "..kZzkkkkkkzZk..", "..kZztkttktzZk..", "...kzkkkkkkzk...", "....kkkkkkkk....", "................"
+        ]
+      ]
+    }
+  }
+}
