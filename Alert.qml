@@ -115,7 +115,7 @@ Item {
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
-      root.shell.hide((root.manifest && root.manifest.id) || "tuland.ominous")
+      root.shell.hide((root.manifest && root.manifest.id) || "io.github.tuland.ominous")
   }
 
   function join() {

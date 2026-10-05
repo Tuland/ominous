@@ -8,12 +8,16 @@ It can be professional, or it can get angry at you.
 Calendar data comes from [OmaCal](https://omacal.app): the plugin reads `omacal agenda --json`
 (OmaCal's offline database) once a minute. No Google login, no token of its own.
 
+## Requirements
+
+- Omarchy with shell plugins (the `omarchy plugin` command).
+- [OmaCal](https://omacal.app), with the `omacal` command on your `PATH` and at least one
+  calendar synced: Ominous reads OmaCal's offline agenda and has no calendar access of its own.
+
 ## Install
 
 ```bash
-git clone https://github.com/Tuland/ominous.git ~/.config/omarchy/plugins/tuland.ominous
-omarchy-shell shell rescanPlugins
-omarchy plugin enable tuland.ominous
+omarchy plugin add https://github.com/Tuland/ominous.git --enable
 ```
 
 ## Try it
@@ -24,6 +28,21 @@ omarchy-shell ominous preview "angry playful"   # straight to the angry phase, p
 ```
 
 Press `Esc` to close the card, `M` to flip between the professional and the playful mode.
+
+## Uninstall
+
+```bash
+omarchy plugin remove io.github.tuland.ominous
+```
+
+Ominous never writes your configuration, but it leaves what you or it created outside the plugin
+folder. Delete these too if you are done with it:
+
+```bash
+rm -f  ~/.config/omarchy/ominous.json   # your config, if you wrote one
+rm -rf ~/.config/omarchy/ominous        # your own themes (Ominous creates the folder, empty)
+rm -rf ~/.local/state/ominous           # the remembered mode and theme choice
+```
 
 ## Documentation
 

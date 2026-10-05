@@ -1,7 +1,7 @@
 schema: spec-driven
 
 context: |
-  Ominous: an Omarchy (Hyprland + Quickshell) shell plugin, id tuland.ominous.
+  Ominous: an Omarchy (Hyprland + Quickshell) shell plugin, id io.github.tuland.ominous.
   Service.qml polls `omacal agenda --json` (OmaCal's offline DB) and summons Alert.qml,
   an overlay card centred on the focused monitor, before a meeting starts.
   Pure logic lives in Logic.js (.pragma library), checked by `node tests/logic.test.mjs`.

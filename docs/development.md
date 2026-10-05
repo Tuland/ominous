@@ -1,8 +1,12 @@
 # Development
 
-Keep the checkout elsewhere and symlink it into `~/.config/omarchy/plugins/tuland.ominous`.
+Keep the checkout elsewhere and symlink it into `~/.config/omarchy/plugins/io.github.tuland.ominous`.
 After editing QML, run `omarchy restart shell`: an overlay already summoned once keeps its old
 code through `rescanPlugins`.
+
+Tools used only for development: `node` (unit tests), `python3` (scripts and the character
+generator), `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick (`magick`, for
+`preview.png`).
 
 ## Layout
 
@@ -14,6 +18,7 @@ code through `rescanPlugins`.
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
+| `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it. |
 | `tests/` | Unit tests by concern (`*.test.mjs`), live checks against the running shell, and `run.sh`. |
 | `openspec/` | Specs and changes. |
 
@@ -43,3 +48,21 @@ rerun it; never edit their JSON by hand, because `tests/run.sh` fails when the t
 tools/draw-themes.py --show  # write the themes and print every frame as text, to review
 tools/draw-themes.py --check # exit 1 if a theme file differs from the script
 ```
+
+## Releasing
+
+The plugin ID, `io.github.tuland.ominous`, is permanent once listed on the
+[Omarchy plugin marketplace](https://plugins.omarchy.org): never change it.
+
+1. Bump `version` in `manifest.json`.
+2. Run `tests/run.sh --restart --keys` and `tests/theme-check.sh <dir>`.
+3. If the card looks different, run `tools/make-preview.sh` and look at `preview.png` before
+   committing it. It summons synthetic cards with an opaque veil, so it never captures the
+   desktop.
+4. Tag the commit `vX.Y.Z`, push, and publish a GitHub release for the tag.
+5. The first time only, with the repository public, submit it through the marketplace's
+   [plugin submission form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml):
+   category **Productivity**, tags **quickshell** and **hyprland**. The marketplace reads the
+   name, description, version and license from `manifest.json`, and the picture from
+   `preview.png`.
+

@@ -33,7 +33,7 @@ Which meetings alert:
 ```bash
 omarchy-shell ominous test                     # a synthetic meeting one minute away: all three phases in a minute
 omarchy-shell ominous preview "tense playful"  # land in one phase and stay there
-omarchy-shell shell hide tuland.ominous        # close the card from a terminal
+omarchy-shell shell hide io.github.tuland.ominous        # close the card from a terminal
 omarchy-shell ominous status                   # JSON: config, mode, themes, counts, next start, errors
 omarchy-shell ominous themes                   # the themes and which mode uses each; see themes.md
 omarchy-shell ominous theme shiba              # choose a theme; see themes.md

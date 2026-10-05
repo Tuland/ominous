@@ -20,7 +20,7 @@ STATE_DIR=$HOME/.local/state/ominous
 STATE=$STATE_DIR/state.json
 THEME_CHOICE=$STATE_DIR/themes.json
 THEMES=$HOME/.config/omarchy/ominous/themes
-ID=tuland.ominous
+ID=io.github.tuland.ominous
 
 pass=0; fail=0; failed=()
 check() {

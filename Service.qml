@@ -16,7 +16,7 @@ Item {
   property var manifest: null
   property var pluginRegistry: null
 
-  readonly property string pluginId: (root.manifest && root.manifest.id) || "tuland.ominous"
+  readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.tuland.ominous"
   readonly property string configPath: Quickshell.env("HOME") + "/.config/omarchy/ominous.json"
 
   readonly property string userThemesDir: Quickshell.env("HOME") + "/.config/omarchy/ominous/themes"

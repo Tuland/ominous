@@ -1,6 +1,6 @@
 # Ominous — agent notes
 
-An Omarchy shell plugin (`tuland.ominous`, kinds `service` + `overlay`). See `README.md` and
+An Omarchy shell plugin (`io.github.tuland.ominous`, kinds `service` + `overlay`). See `README.md` and
 `docs/` for what it does, `docs/development.md` for the layout and checks, `openspec/` for specs
 and changes. User-facing changes update the matching page in `docs/` (`tests/docs.test.mjs`
 checks config keys, IPC commands, themes and links).
@@ -38,6 +38,9 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 - Calendar data is untrusted input: only `https://` URLs are ever opened (`Logic.safeUrl`).
 - The status IPC never prints meeting titles.
 - Theme art is original: no traced sprites, no third-party names or trademarks in theme names.
+- The plugin ID `io.github.tuland.ominous` is permanent (marketplace rule): never change it.
+  `tests/packaging.test.mjs` checks every place it is written.
+- `preview.png` comes only from `tools/make-preview.sh` (synthetic cards, no desktop).
 - Commits and pushes wait for the user to ask.
 
 ## Checking a change
@@ -50,7 +53,7 @@ tests/theme-check.sh <dir>       # card under a light and a dark Omarchy theme, 
 omarchy restart shell            # QML changes: an already-summoned overlay keeps old code
 omarchy-shell ominous test       # synthetic alert now
 omarchy-shell ominous preview "angry playful"   # hold one phase/mode; add a long title to test fit
-omarchy-shell shell hide tuland.ominous         # close it again (the card grabs the keyboard)
+omarchy-shell shell hide io.github.tuland.ominous         # close it again (the card grabs the keyboard)
 omarchy-shell ominous status     # config, counts, next start, last error
 ```
 

@@ -17,7 +17,7 @@ set -u
 OUT=${1:-$(mktemp -d)}; mkdir -p "$OUT"
 CUR=$HOME/.local/state/omarchy/current
 THEMES=$HOME/.config/omarchy/ominous/themes
-ID=tuland.ominous
+ID=io.github.tuland.ominous
 LIGHT="Catppuccin Latte"; DARK="Gruvbox"
 SNAP=$(mktemp -d)
 
