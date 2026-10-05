@@ -87,3 +87,37 @@ describe("status", () => {
     assert.equal(L.statusSnapshot(undefined, cfg, now).events, 0)
   })
 })
+
+describe("only meetings with a join link", () => {
+  const withLink = L.normalizeConfig({ onlyWithLink: true })
+  const link = "https://meet.google.com/abc-defg-hij"
+
+  test("off by default, and only true turns it on", () => {
+    assert.equal(L.normalizeConfig(null).onlyWithLink, false)
+    assert.equal(withLink.onlyWithLink, true)
+    for (const v of ["yes", "true", 1, null, {}, []]) assert.equal(L.normalizeConfig({ onlyWithLink: v }).onlyWithLink, false, JSON.stringify(v))
+  })
+
+  test("off: a meeting without a link still alerts", () => {
+    assert.equal(L.isAlertable(ev({}), L.normalizeConfig({})), true)
+  })
+
+  test("on: only an https conference link counts", () => {
+    assert.equal(L.isAlertable(ev({ conference: link }), withLink), true)
+    assert.equal(L.isAlertable(ev({}), withLink), false)
+    assert.equal(L.isAlertable(ev({ conference: "" }), withLink), false)
+    assert.equal(L.isAlertable(ev({ conference: "http://example.com/call" }), withLink), false)
+    assert.equal(L.isAlertable(ev({ location: link }), withLink), false)                    // a link only in the location
+  })
+
+  test("on: the other rules still apply", () => {
+    assert.equal(L.isAlertable(ev({ conference: link, allDay: true }), withLink), false)
+    assert.equal(L.isAlertable(ev({ conference: link, response: "declined" }), withLink), false)
+  })
+
+  test("on: status counts and alerts follow the same rule", () => {
+    const events = [ev({ eventId: 1, startMs: now + 30_000 }), ev({ eventId: 2, startMs: now + 40_000, conference: link })]
+    assert.equal(L.statusSnapshot(events, withLink, now).upcomingAlertable, 1)
+    assert.equal(L.nextDue(events, now, { ...withLink, leadSeconds: 60 }, {})?.eventId, 2)
+  })
+})

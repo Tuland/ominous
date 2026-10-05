@@ -15,6 +15,7 @@ Which meetings alert:
 - Only calendars listed in `calendars` (all of them when the list is empty); see
   [configuration](configuration.md).
 - All-day events and declined invitations never alert.
+- With `onlyWithLink`, only meetings with an `https://` join link alert.
 - A meeting that started less than two minutes ago still alerts, to cover a suspend, a shell
   restart or a late sync.
 

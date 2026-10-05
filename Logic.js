@@ -21,7 +21,8 @@ var DEFAULTS = {
   dim: null,          // 0..1 opacity of the veil behind the card; null = theme's menu scrim
   tenseSeconds: 15,   // the card turns "tense" this long before the start; 0 = never
   mode: "professional",
-  themes: { professional: "classic", playful: "marine" }
+  themes: { professional: "classic", playful: "marine" },
+  onlyWithLink: false // true = alert only for meetings with an https join link
 }
 
 var MODES = ["professional", "playful"]
@@ -71,7 +72,8 @@ function normalizeConfig(raw) {
   var cfg = {
     calendars: DEFAULTS.calendars.slice(), leadSeconds: DEFAULTS.leadSeconds, dim: DEFAULTS.dim,
     tenseSeconds: DEFAULTS.tenseSeconds, mode: DEFAULTS.mode,
-    themes: { professional: DEFAULTS.themes.professional, playful: DEFAULTS.themes.playful }
+    themes: { professional: DEFAULTS.themes.professional, playful: DEFAULTS.themes.playful },
+    onlyWithLink: DEFAULTS.onlyWithLink
   }
   if (!raw || typeof raw !== "object") return cfg
   if (Array.isArray(raw.calendars))
@@ -86,6 +88,7 @@ function normalizeConfig(raw) {
   if (MODES.indexOf(raw.mode) >= 0) cfg.mode = raw.mode
   if (raw.themes && typeof raw.themes === "object")
     MODES.forEach(function(m) { if (isThemeName(raw.themes[m])) cfg.themes[m] = raw.themes[m] })
+  if (raw.onlyWithLink === true) cfg.onlyWithLink = true
   return cfg
 }
 
@@ -130,6 +133,8 @@ function resolveThemes(saved, cfg) {
 function isAlertable(ev, cfg) {
   if (!ev || ev.allDay || ev.response === "declined") return false
   if (!(Number(ev.startMs) > 0)) return false
+  // The same rule as the Join button: only an https conference link counts.
+  if (cfg.onlyWithLink && safeUrl(ev.conference) === "") return false
   if (cfg.calendars.length === 0) return true
   var name = String(ev.calendar || "").toLowerCase()
   var id = String(ev.calendarId)

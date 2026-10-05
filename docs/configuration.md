@@ -6,6 +6,7 @@ writes it.
 | Key | Default | Meaning |
 |---|---|---|
 | `calendars` | `[]` | Calendar names or ids (as `omacal calendars` lists them) that alert. Empty = all. |
+| `onlyWithLink` | `false` | `true` = alert only for meetings with a join link (an `https://` conference link from OmaCal). A link written only in the location does not count. |
 | `leadSeconds` | `60` | How long before the start the card appears (0–3600). |
 | `tenseSeconds` | `15` | How long before the start the card turns from relaxed to tense (0–3600). `0` skips the tense phase. |
 | `dim` | theme | Opacity of the veil over the rest of the monitor, `0`–`1`. Unset = the theme's menu scrim. |
