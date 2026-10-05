@@ -22,6 +22,8 @@ agent.
   reported as info; anything else fails. Where the Omarchy shell is not installed (GitHub),
   `qmllint` is skipped with a notice and `shellcheck` still runs.
 - `tests/run.sh --unit` runs `tools/lint.sh`, so the CI runs it too.
+- `mise.toml` pins `node` and `shellcheck`, and the CI installs them from it, so the local
+  checks and the CI run the same versions.
 - `tools/shoot-card.sh` refuses a capture when anything besides the card is on the veil: a
   notification above the overlay once put part of the desktop into a picture.
 - Doc comments everywhere, in one family of styles:
@@ -53,6 +55,6 @@ None.
 ## Impact
 
 Changed: `Alert.qml`, `Service.qml`, `Logic.js`, every file in `components/`, `tests/*.sh`,
-`tools/*` (including `tools/shoot-card.sh`), `tests/run.sh`, `docs/development.md`, `CLAUDE.md`, `openspec/config.yaml`. New: `tools/lint.sh`,
+`tools/*` (including `tools/shoot-card.sh`), `tests/run.sh`, `docs/development.md`, `CLAUDE.md`, `openspec/config.yaml`. New: `tools/lint.sh`, `mise.toml`,
 `tests/style.test.mjs`. The plugin's behavior is unchanged: the unit and live suites must pass
 as before. The CI gains `shellcheck` (preinstalled on the GitHub runners).

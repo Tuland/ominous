@@ -21,6 +21,8 @@ cause in ours.
 - Type-checking `Logic.js` with `tsc --checkJs`: a separate change, which the JSDoc types make
   possible later.
 - `mypy` for `tools/draw-themes.py`, and formatting tools (`qmlformat`, `shfmt`).
+- Pinning `qmllint` and `python3`: `qmllint` comes with the Qt of the Omarchy shell and runs
+  only locally; the Python script uses only the standard library.
 - Silencing the shell's own findings by changing the shell: it is read-only.
 
 ## Decisions
@@ -85,3 +87,7 @@ behavior change cannot hide among comment edits.
 - [Comments go stale] → The style test checks they exist and name each parameter, not that
   they are true. Reviews still read them.
 - [A future Quickshell exports the missing types] → The info categories just print less.
+- [Tools differ between the local machine and the runner: Node 26 against 24 once hid a
+  failure, shellcheck 0.11 against 0.9 another] → `mise.toml` pins `node` and `shellcheck`;
+  the CI installs them from it with `jdx/mise-action`, so both run the same versions.
+  Without mise, the system tools still work, with that risk.

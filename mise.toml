@@ -1,0 +1,5 @@
+# The development tools and their versions, the same on every machine and on the CI
+# (.github/workflows/tests.yml installs them with mise-action). Change a version here only.
+[tools]
+node = "24"
+shellcheck = "0.11.0"

@@ -1,6 +1,7 @@
 # The checks that need no Omarchy shell: unit tests (node --test) and the shipped themes
 # against tools/draw-themes.py. The live checks need a running shell and stay local
-# (tests/run.sh without --unit). Actions are pinned to full commits.
+# (tests/run.sh without --unit). Actions are pinned to full commits; tool versions come from
+# mise.toml.
 name: tests
 
 on:
@@ -15,8 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-      - name: Unit tests and theme art check
+      # Node and shellcheck at the versions in mise.toml, the same as on a developer's machine.
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - name: Unit tests, theme art check and lint
         run: tests/run.sh --unit

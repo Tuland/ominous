@@ -4,6 +4,12 @@ Keep the checkout elsewhere and symlink it into `~/.config/omarchy/plugins/io.gi
 After editing QML, run `omarchy restart shell`: an overlay already summoned once keeps its old
 code through `rescanPlugins`.
 
+`mise.toml` pins `node` and `shellcheck`, the tools whose version changes a result; the CI
+installs the same versions from it. With [mise](https://mise.jdx.dev) active in your shell,
+run `mise trust` and `mise install` once in the checkout, and every command there uses them.
+Without mise, the tests still run with the system's tools, but a different version may report
+what the CI does not, or the reverse.
+
 Tools used only for development: `node` (unit tests), `python3` (scripts and the character
 generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`) and `shellcheck` (static checks),
 `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick (`magick`, for

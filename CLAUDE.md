@@ -56,6 +56,9 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 
 ## Checking a change
 
+`mise.toml` pins `node` and `shellcheck` to the CI's versions. A non-interactive shell does not
+run mise's hook, so prefix the checks with `mise exec --` (e.g. `mise exec -- tests/run.sh --unit`).
+
 ```bash
 tests/run.sh                     # everything: unit + art check + lint + live, one history line in tests/results.log
 tests/run.sh --unit              # unit + art check + lint, no shell needed

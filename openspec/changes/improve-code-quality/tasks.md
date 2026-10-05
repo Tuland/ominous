@@ -22,4 +22,6 @@
 
 - [x] 4.1 `docs/development.md`: the doc styles with one short example each, and `tools/lint.sh`. `CLAUDE.md`: the styles and the lint step in the rules and the checks. Verify the docs tests pass
 - [x] 4.2 Bring the context in `openspec/config.yaml` up to date: it named the removed `tests/logic.test.mjs` and only three config keys; it now points to `docs/` and `CLAUDE.md` for details. Verify `openspec validate --all --strict` and the plugin ID test pass
-- [ ] 4.3 `tests/run.sh` (unit, lint and live) passes after `omarchy restart shell`; after the push, the CI is green
+- [x] 4.3 Fix the first CI run, which failed: the runner's shellcheck (0.9.0, from Ubuntu 24.04) reports SC2002 (useless cat, in `tests/theme-check.sh`), optional since 0.10, and the local 0.11.0 does not. The cat is gone. Verify `tools/lint.sh` passes
+- [x] 4.4 Pin the tools whose version changes a result in `mise.toml` (`node` 24, `shellcheck` 0.11.0); the CI installs them with `jdx/mise-action` pinned to a commit instead of `actions/setup-node`. `docs/development.md` and `CLAUDE.md` explain `mise trust`, `mise install` and `mise exec --`. Verify inside the checkout `node` is 24 and `shellcheck` 0.11.0 while outside nothing changes, and `mise exec -- tests/run.sh --unit` passes
+- [ ] 4.5 `tests/run.sh` (unit, lint and live) passes after `omarchy restart shell`; after the push, the CI is green

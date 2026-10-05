@@ -88,7 +88,7 @@ restore() {
     echo "PASS everything is back as it was: $ORIGINAL, same background, $(wc -l < "$SNAP/after.txt") manifest lines identical"
     rm -rf "$SNAP"
   else
-    echo "FAIL the state differs from before; see $SNAP/diff.txt"; cat "$SNAP/diff.txt" | head -30
+    echo "FAIL the state differs from before; see $SNAP/diff.txt"; head -30 "$SNAP/diff.txt"
     exit 1
   fi
 }
