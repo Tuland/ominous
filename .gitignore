@@ -1,1 +1,117 @@
+# What git leaves out, grouped by where it comes from. Some groups cover tools this repository
+# does not use yet; they are common enough to keep out of a stray `git add`.
+# tests/packaging.test.mjs fails if a rule here matches a tracked file.
+
+# ---- This repository
 tests/results.log
+
+# ---- Operating systems
+# Linux
+*~
+.directory
+.fuse_hidden*
+.nfs*
+.Trash-*
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---- Editors and IDEs
+.vscode/
+*.code-workspace
+.history/
+.idea/
+*.iml
+*.swp
+*.swo
+*.swn
+.netrwhist
+Session.vim
+\#*\#
+.#*
+*.sublime-project
+*.sublime-workspace
+.zed/
+*.kate-swp
+.fleet/
+
+# ---- JavaScript and TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.yarn/
+.pnp.*
+*.tsbuildinfo
+coverage/
+.nyc_output/
+.eslintcache
+dist/
+build/
+
+# ---- Python
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytest_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+.ipynb_checkpoints/
+
+# ---- QML and Qt
+*.qmlc
+*.jsc
+.qmlls.ini
+*.pro.user
+*.pro.user.*
+CMakeLists.txt.user*
+.qtcreator/
+
+# ---- Shell, logs and leftovers
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ---- Secrets and local settings (never commit these)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+mise.local.toml
+.mise.local.toml
+mise.*.local.toml
+.envrc
+.direnv/
+.claude/settings.local.json
+CLAUDE.local.md

@@ -1,4 +1,5 @@
 // How Ominous is identified and presented: one plugin ID everywhere, the marketplace's needs.
+import { execFileSync } from "node:child_process"
 import { readFileSync, readdirSync } from "node:fs"
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
@@ -96,5 +97,14 @@ describe("changelog", () => {
 
   test("its newest released version is the manifest's", () => {
     assert.equal(released[0], manifest.version, "CHANGELOG.md has no section for " + manifest.version + " on top")
+  })
+})
+
+describe(".gitignore", () => {
+  test("ignores no tracked file", () => {
+    // Files git tracks although a rule in .gitignore matches them: a rule too broad.
+    const hidden = execFileSync("git", ["ls-files", "-ci", "--exclude-standard"],
+                                { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim()
+    assert.equal(hidden, "", ".gitignore matches tracked files:\n" + hidden)
   })
 })
