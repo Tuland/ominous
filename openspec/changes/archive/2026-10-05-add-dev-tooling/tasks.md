@@ -20,7 +20,7 @@
 
 - [x] 4.1 Add `.github/workflows/tests.yml`: `tests/run.sh --unit` on push and pull request, Node 24, read-only permissions, actions pinned to full commits. Verify the YAML parses and the same command passes in a clean environment (no Omarchy config, empty HOME)
 - [x] 4.2 Fix the first CI run, which failed: Node 24 reads `node --test tests/` as a module path (only Node 26 accepts a folder). `tests/run.sh` passes `'tests/*.test.mjs'` with `--test-reporter=spec`, whose summary it parses on every Node version. Verify `tests/run.sh --unit` passes in a fresh clone with an empty HOME on the system Node 22, and locally on Node 26
-- [ ] 4.3 After the next push, check the workflow run on GitHub is green
+- [x] 4.3 After the next push, check the workflow run on GitHub is green
 
 ## 5. Notes for contributors and agents
 
