@@ -7,4 +7,4 @@
 
 ## 2. Check
 
-- [ ] 2.1 `mise exec -- tests/run.sh --unit` passes; after the push, the CI is green
+- [x] 2.1 `mise exec -- tests/run.sh --unit` passes; after the push, the CI is green
