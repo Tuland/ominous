@@ -11,7 +11,7 @@
 
 ## 3. Preview image
 
-- [x] 3.1 Add `tools/make-preview.sh`: summon synthetic `classic` tense and `marine` angry cards with `dim: 1`, capture the focused monitor, compose both on a 1920x1080 canvas with ImageMagick into `preview.png`. Verify the image shows only the two cards on a solid background (looked at before committing)
+- [x] 3.1 Add `tools/make-preview.sh`: summon one synthetic card per shipped theme with `dim: 1` (`classic` tense, `marine` relaxed, `shiba` tense, `boss` angry), capture the focused monitor, compose a 2x2 grid with a caption under each card on a 1920x1080 canvas with ImageMagick into `preview.png`. Verify the image shows only the cards and captions on a solid background, readable at the 720x405 thumbnail size (looked at before committing)
 - [x] 3.2 Add a unit test that `preview.png` exists and is at least 1600x900 (read from the PNG header). Verify it fails without the file
 
 ## 4. Release checklist

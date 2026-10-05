@@ -27,6 +27,20 @@ describe("plugin ID", () => {
   })
 })
 
+describe("what the marketplace search reads", () => {
+  // The site searches the manifest's name and description (plus ID, author, category, tags),
+  // never the README: these are the words people look for.
+  test("the name says meeting", () => {
+    assert.match(manifest.name, /\bMeeting\b/)
+  })
+
+  test("the description names OmaCal and the calendar words people search", () => {
+    for (const word of ["Meeting", "alert", "OmaCal", "calendar", "Google Calendar"])
+      assert.ok(manifest.description.includes(word), "description mentions " + word)
+    assert.doesNotMatch(manifest.description, /meetingbar/i, "no other product's name as a search hook")
+  })
+})
+
 describe("README for the marketplace", () => {
   const readme = read("README.md")
   const section = (title) => (readme.split(/^## /m).find((s) => s.startsWith(title)) || "")
@@ -43,6 +57,13 @@ describe("README for the marketplace", () => {
     const s = section("Uninstall")
     for (const p of ["~/.config/omarchy/ominous.json", "~/.config/omarchy/ominous", "~/.local/state/ominous"])
       assert.ok(s.includes(p), "Uninstall names " + p)
+  })
+
+  test("says it needs OmaCal before anything else, with links", () => {
+    const top = readme.slice(0, readme.indexOf("\n## "))
+    const firstBlock = top.split(/\n\s*\n/).find((b) => !b.startsWith("#"))
+    assert.match(firstBlock, /Requires \[OmaCal\]\(https:\/\/omacal\.app\)/)
+    assert.match(firstBlock, /https:\/\/github\.com\/x3me\/omacal/)
   })
 
   test("states its requirements, OmaCal among them", () => {

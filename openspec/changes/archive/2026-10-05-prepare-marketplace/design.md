@@ -48,9 +48,11 @@ The steps are checked afterwards with `omarchy plugin list` and the live suite.
 <payload>`. The payload is synthetic: a made-up meeting, the theme files read from `themes/`,
 and `dim: 1`. With full dimming the veil behind the card is opaque, the theme's background
 color, so a capture of the focused monitor contains the card and nothing of the desktop. The
-script captures two states, `classic` in the tense phase and `marine` once angry, and composes
-them side by side with ImageMagick on a 1920x1080 canvas of the same color. The card's colors
-are those of the Omarchy theme active when the script runs.
+script captures one card per shipped theme and composes a 2x2 grid with ImageMagick on a
+1920x1080 canvas of the same color. The grid is `classic` (professional, tense), `marine`
+(relaxed), `shiba` (tense) and `boss` (angry), so together they show every phase. Each card has
+a caption naming the theme and the phase, in the shell's monospace font and the theme's
+foreground color. The card's colors are those of the Omarchy theme active when the script runs.
 
 - *Alternative: crop around the card on a normal capture.* Rejected. The edges show the desktop
   behind the card, as the manual screenshots during development did.

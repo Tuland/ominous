@@ -1,18 +1,21 @@
 # Ominous
 
+> **Requires [OmaCal](https://omacal.app)** ([source](https://github.com/x3me/omacal)), the native
+> desktop calendar for Google Calendar, iCloud and CalDAV. Ominous reads OmaCal's offline agenda
+> and has no calendar access of its own: no OmaCal, no alerts.
+
 *The ominous meeting.* An [Omarchy](https://omarchy.org) shell plugin that puts a big card in
 the middle of the focused monitor shortly before a meeting starts, over a dimmed screen. It
 stays until you dismiss it or the meeting ends — a corner toast is exactly what gets missed.
 It can be professional, or it can get angry at you.
 
-Calendar data comes from [OmaCal](https://omacal.app): the plugin reads `omacal agenda --json`
-(OmaCal's offline database) once a minute. No Google login, no token of its own.
+It reads `omacal agenda --json` once a minute. No Google login, no token of its own.
 
 ## Requirements
 
 - Omarchy with shell plugins (the `omarchy plugin` command).
-- [OmaCal](https://omacal.app), with the `omacal` command on your `PATH` and at least one
-  calendar synced: Ominous reads OmaCal's offline agenda and has no calendar access of its own.
+- [OmaCal](https://omacal.app) ([install](https://omacal.app/download)), with the `omacal`
+  command on your `PATH` and at least one calendar synced.
 
 ## Install
 

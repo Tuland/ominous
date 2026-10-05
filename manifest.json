@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "id": "io.github.tuland.ominous",
-  "name": "Ominous",
+  "name": "Ominous Meeting",
   "version": "0.2.0",
   "author": "Tullio Landoni",
   "license": "MIT",
-  "description": "The ominous meeting: a big card in the middle of the screen a minute before a meeting starts, fed by OmaCal.",
+  "description": "Meeting alerts for OmaCal: a big card in the middle of the screen before each calendar event (Google Calendar, iCloud, CalDAV), professional or with angry pixel-art faces.",
   "kinds": [
     "service",
     "overlay"
