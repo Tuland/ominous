@@ -41,6 +41,9 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 - The plugin ID `io.github.tuland.ominous` is permanent (marketplace rule): never change it.
   `tests/packaging.test.mjs` checks every place it is written.
 - `preview.png` comes only from `tools/make-preview.sh` (synthetic cards, no desktop).
+- Every change goes through OpenSpec (`openspec new change`, then the artifacts the schema asks
+  for, checked with `openspec instructions`). Behavior, config, commands and packaging get spec
+  deltas; tooling, tests, CI and agent skills set `skip_specs: true` in `.openspec.yaml`.
 - Commits and pushes wait for the user to ask.
 
 ## Checking a change
@@ -58,5 +61,7 @@ omarchy-shell ominous status     # config, counts, next start, last error
 ```
 
 Live checks and screenshots touch the user's real session: the card grabs the keyboard, so
-never inject keys unless the overlay is open; restore any state file or theme you change; crop
-screenshots to the card (`grim -g` takes global layout coordinates, see `tests/theme-check.sh`).
+never inject keys unless the overlay is open; restore any state file or theme you change. To
+look at the card, use `tools/shoot-card.sh` (a synthetic card on an opaque veil), never a raw
+screenshot of the screen. For theme and character work, follow the `ominous-theme` skill
+(`.claude/skills/ominous-theme/`).

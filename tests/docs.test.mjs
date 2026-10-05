@@ -58,3 +58,14 @@ describe("docs", () => {
       assert.ok(md.includes("| `" + f.replace(".json", "") + "` |"), "themes.md lists " + f)
   })
 })
+
+describe("ominous-theme skill", () => {
+  test("names only files that exist", () => {
+    const skill = read(".claude/skills/ominous-theme/SKILL.md")
+    // Backticked repo paths, e.g. `tools/shoot-card.sh` or `tests/themes.test.mjs`.
+    const paths = [...skill.matchAll(/`((?:tools|tests|docs|themes|openspec|components)\/[\w./-]+?)`/g)]
+      .map((m) => m[1]).filter((p) => !p.includes("<"))
+    assert.ok(paths.length >= 5, "found the paths the skill names")
+    for (const p of paths) assert.ok(exists(p), "the skill names a missing " + p)
+  })
+})

@@ -10,23 +10,18 @@
 # the background link, the config of the apps a full theme change would restart, gsettings).
 # On exit, success or not, it puts the copy back, re-applies the original palette and diffs the
 # manifest: any difference is reported and the exit status is 1.
-# The captures are crops around the card, but a sliver of the desktop can show at the edges:
-# keep them out of the repo.
+# The pictures come from tools/shoot-card.sh: a synthetic card on an opaque veil, the theme
+# carried in the payload, so no desktop shows and no user theme file is touched.
 
 set -u
 OUT=${1:-$(mktemp -d)}; mkdir -p "$OUT"
 CUR=$HOME/.local/state/omarchy/current
-THEMES=$HOME/.config/omarchy/ominous/themes
 ID=io.github.tuland.ominous
 LIGHT="Catppuccin Latte"; DARK="Gruvbox"
 SNAP=$(mktemp -d)
 
+SHOOT=$(dirname "$0")/../tools/shoot-card.sh
 hide() { omarchy-shell -q shell hide "$ID"; }
-wait_for() { local n=$1; shift; local i; for ((i = 0; i < n; i++)); do "$@" && return 0; sleep 0.2; done; return 1; }
-overlay_open() {
-  hyprctl layers -j | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any(l["namespace"]=="ominous-alert" for v in d.values() for ls in v["levels"].values() for l in ls) else 1)'
-}
-overlay_closed() { ! overlay_open; }
 
 # Everything a theme change could touch, as stable text.
 manifest() {
@@ -56,7 +51,6 @@ apply_palette() {   # what omarchy-theme-set sends the running shell
 omarchy-shell ominous status >/dev/null 2>&1 || { echo "FAIL the ominous plugin does not answer"; exit 1; }
 manifest > "$SNAP/before.txt"
 cp -a "$CUR/theme" "$SNAP/theme"; cp -a "$CUR/theme.name" "$SNAP/theme.name"
-[[ -f $THEMES/marine.json ]] && cp -p "$THEMES/marine.json" "$SNAP/marine.json"
 ORIGINAL=$(omarchy-theme-current)
 echo "saved: $ORIGINAL ($(wc -l < "$SNAP/before.txt") manifest lines) -> $SNAP"
 
@@ -65,7 +59,6 @@ restore() {
   ((restored)) && return; restored=1
   hide
   rm -rf "$CUR/theme"; cp -a "$SNAP/theme" "$CUR/theme"; cp -a "$SNAP/theme.name" "$CUR/theme.name"
-  rm -f "$THEMES/marine.json"; [[ -f $SNAP/marine.json ]] && cp -p "$SNAP/marine.json" "$THEMES/marine.json"
   apply_palette
   sleep 1
   manifest > "$SNAP/after.txt"
@@ -80,32 +73,18 @@ restore() {
 trap 'restore' EXIT
 trap 'exit 130' INT TERM
 
-# The focused monitor's centre, in layout coordinates, for a crop around the card.
-crop=$(hyprctl monitors -j | python3 -c '
-import json,sys
-m=next(m for m in json.load(sys.stdin) if m["focused"])
-w,h=m["width"]/m["scale"],m["height"]/m["scale"]
-print("%d,%d 700x420" % (m["x"]+w/2-350, m["y"]+h/2-210))')
-
-shoot() {   # label, spec
-  omarchy-shell ominous preview "$2 Weekly sync" >/dev/null
-  wait_for 15 overlay_open || { echo "FAIL the card did not open for '$2'"; return 1; }
-  sleep 1.3
-  grim -g "$crop" "$OUT/$1.png" && echo "shot $1.png"
-  hide; wait_for 15 overlay_closed
+shoot() {   # label, theme, mode, phase
+  "$SHOOT" "$2" "$3" "$4" "$OUT/$1.png" "Weekly sync" >/dev/null && echo "shot $1.png" || echo "FAIL shot $1"
 }
 
-hide; wait_for 15 overlay_closed
-for art in marine shiba; do
-  rm -f "$THEMES/marine.json"
-  [[ $art == shiba ]] && cp "$(dirname "$0")/../themes/shiba.json" "$THEMES/marine.json"   # a user "marine" overrides the shipped one
-  sleep 1.6
-  for theme in "$LIGHT" "$DARK"; do
-    OMARCHY_THEME_HEADLESS=1 OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$theme" >/dev/null || { echo "FAIL omarchy-theme-set '$theme'"; exit 1; }
-    apply_palette; sleep 1.5
-    slug=${theme// /-}
-    for phase in relaxed tense angry; do shoot "$art-$slug-$phase" "$phase playful"; done
-    [[ $art == marine ]] && shoot "classic-$slug-angry" "angry professional"
+hide
+for theme in "$LIGHT" "$DARK"; do
+  OMARCHY_THEME_HEADLESS=1 OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$theme" >/dev/null || { echo "FAIL omarchy-theme-set '$theme'"; exit 1; }
+  apply_palette; sleep 1.5
+  slug=${theme// /-}
+  for art in marine shiba boss; do
+    for phase in relaxed tense angry; do shoot "$art-$slug-$phase" "$art" playful "$phase"; done
   done
+  shoot "classic-$slug-angry" marine professional angry
 done
 echo "screenshots: $OUT"

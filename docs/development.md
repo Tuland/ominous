@@ -18,7 +18,9 @@ generator), `grim` (screenshots), `wtype` (the `--keys` checks) and ImageMagick 
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
-| `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it. |
+| `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
+| `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
+| `.claude/skills/ominous-theme/` | The agent skill for drawing and reviewing characters. |
 | `tests/` | Unit tests by concern (`*.test.mjs`), live checks against the running shell, and `run.sh`. |
 | `openspec/` | Specs and changes. |
 
@@ -33,7 +35,8 @@ tests/theme-check.sh <dir>   # the card under a light and a dark Omarchy theme, 
 ```
 
 Every `tests/run.sh` adds a line to `tests/results.log` (not committed): date, commit, results
-and what failed.
+and what failed. On GitHub, `.github/workflows/tests.yml` runs `tests/run.sh --unit` on every
+push and pull request; the live checks need a running shell and stay local.
 
 The live checks use your real session: the card shows up and grabs the keyboard several times.
 They restore the state files and any user theme they touch, and check that `ominous.json` is
@@ -47,6 +50,7 @@ rerun it; never edit their JSON by hand, because `tests/run.sh` fails when the t
 ```bash
 tools/draw-themes.py --show  # write the themes and print every frame as text, to review
 tools/draw-themes.py --check # exit 1 if a theme file differs from the script
+tools/shoot-card.sh shiba playful angry /tmp/shiba.png   # look at one theme in one phase
 ```
 
 ## Releasing
@@ -55,7 +59,8 @@ The plugin ID, `io.github.tuland.ominous`, is permanent once listed on the
 [Omarchy plugin marketplace](https://plugins.omarchy.org): never change it.
 
 1. Bump `version` in `manifest.json`.
-2. Run `tests/run.sh --restart --keys` and `tests/theme-check.sh <dir>`.
+2. Run `tests/run.sh --restart --keys` and `tests/theme-check.sh <dir>`, and check that the
+   GitHub workflow is green.
 3. If the card looks different, run `tools/make-preview.sh` and look at `preview.png` before
    committing it. It summons synthetic cards with an opaque veil, so it never captures the
    desktop.
