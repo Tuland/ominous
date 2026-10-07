@@ -49,6 +49,21 @@ describe("QML", () => {
       assert.ok(root > 0 && blockAbove(lines, root) !== "", file + " has no /** */ block above its root object")
     })
 
+    test(file + " shows every Text as plain text", () => {
+      // Qt's default AutoText renders a string that looks like markup as rich text, and rich
+      // text loads <img> sources from the network: calendar data must never be parsed.
+      lines.forEach((l, i) => {
+        if (!/^\s*Text\s*\{/.test(l)) return
+        let depth = 0, j = i, body = ""
+        do {
+          for (const ch of lines[j]) depth += ch === "{" ? 1 : ch === "}" ? -1 : 0
+          body += lines[j] + "\n"
+          j++
+        } while (depth > 0 && j < lines.length)
+        assert.match(body, /textFormat: Text\.PlainText/, file + ":" + (i + 1) + " has a Text without textFormat: Text.PlainText")
+      })
+    })
+
     test(file + " documents every function", () => {
       lines.forEach((l, i) => {
         const m = /^\s*function (\w+)\(/.exec(l)

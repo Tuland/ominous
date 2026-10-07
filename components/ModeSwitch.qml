@@ -26,6 +26,7 @@ Row {
   Text {
     anchors.verticalCenter: parent.verticalCenter
     text: "Playful"
+    textFormat: Text.PlainText
     color: control.mutedColor
     font.family: Style.font.family
     font.pixelSize: Style.font.caption

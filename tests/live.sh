@@ -108,6 +108,9 @@ check "a garbage state file falls back to the config mode" state_garbage
 check "deleting the state file falls back to the config mode" state_removed
 
 # ---- user themes
+# These checks break and fix a user marine.json, so playful must use marine: forget a saved
+# theme choice (themes.json is restored on exit).
+rm -f "$THEME_CHOICE"; settle
 # Prints the service's theme error, empty when none.
 theme_err() { jsonget "d['themeError']"; }
 mkdir -p "$THEMES"

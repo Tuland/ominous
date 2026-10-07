@@ -278,6 +278,7 @@ Item {
             anchors.rightMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             text: (root.started ? "MEETING STARTED" : "MEETING") + (root.calendar ? "  ·  " + root.calendar : "")
+            textFormat: Text.PlainText
             color: root.mutedColor
             font.family: Style.font.family
             font.pixelSize: Style.font.body
@@ -327,6 +328,7 @@ Item {
           topPadding: Style.space(8)
           bottomPadding: Style.space(8)
           text: Logic.countdown(root.startMs, root.nowMs)
+          textFormat: Text.PlainText
           color: root.signalColor
           font.family: Style.font.family
           font.pixelSize: Math.round(root.hero * 2)
@@ -380,6 +382,7 @@ Item {
           width: parent.width
           elide: Text.ElideRight
           text: (root.url !== "" ? "← →  choose    " : "") + "Enter  confirm    Esc  dismiss    M  mode"
+          textFormat: Text.PlainText
           color: root.mutedColor
           font.family: Style.font.family
           font.pixelSize: Style.font.caption

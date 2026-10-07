@@ -6,6 +6,12 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Security
+- The calendar name on the card's top line is shown as plain text. Before, a name that looked
+  like markup was rendered as rich text, so the owner of a shared calendar could make the card
+  load an external image (`<img src="https://...">`) when an alert opened. Every text on the
+  card is now plain text, and a test keeps it so.
+
 ## [0.2.0] - 2026-10-05
 
 ### Changed

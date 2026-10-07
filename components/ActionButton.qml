@@ -31,6 +31,7 @@ Rectangle {
     id: btnLabel
     anchors.centerIn: parent
     text: btn.label
+    textFormat: Text.PlainText
     color: btn.current ? btn.cardColor : btn.textColor
     font.family: Style.font.family
     font.pixelSize: Style.font.title
