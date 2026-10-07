@@ -42,7 +42,9 @@ is read. A value of a known key that Ominous ignores (wrong type, out of range, 
 entry) SHALL be reported the same way in `ignoredValues`, naming the key and the value. A file
 that cannot be read SHALL give the defaults for every key, and `status` SHALL report why in
 `configError`. None of these SHALL show anything on the alert card. Names and values SHALL be
-printed escaped, each on one line.
+printed escaped, each on one line, a key nested under `themes` included. A file that is absent
+SHALL give the defaults without a `configError`; a file that exists but cannot be read SHALL set
+it.
 
 #### Scenario: A misspelt key
 - **WHEN** `ominous.json` holds `{ "leadsecond": 30 }`
@@ -71,6 +73,14 @@ printed escaped, each on one line.
 #### Scenario: A misspelt mode inside themes
 - **WHEN** `ominous.json` holds `{ "themes": { "Playful": "boss" } }`
 - **THEN** the playful theme keeps its default and `ignoredValues` names `themes.Playful`
+
+#### Scenario: A line break in a key under themes
+- **WHEN** `ominous.json` holds `{ "themes": { "a\nb": "x" }, "leadSeconds": 30 }`, the key written with an escaped line break
+- **THEN** `ignoredValues` and the shell log name it on one line, and the output of `config` reads back with `leadSeconds` 30
+
+#### Scenario: A file that cannot be read
+- **WHEN** `ominous.json` exists but the user cannot read it
+- **THEN** every key has its default and `status` reports a non-empty `configError`
 
 #### Scenario: Broken JSON
 - **WHEN** `ominous.json` is not valid even with comments and trailing commas allowed
