@@ -121,7 +121,8 @@ describe("Python", () => {
 
 describe("APIs that run or load from a string", () => {
   // Argued in docs/development.md, "Security", which lists the same names.
-  const forbidden = ["eval(", "createQmlObject", "openUrlExternally", "Loader", "Image", "AnimatedImage", "XMLHttpRequest", "ToolTip"]
+  const forbidden = ["eval(", "createQmlObject", "openUrlExternally", "Loader", "Image", "AnimatedImage", "XMLHttpRequest", "ToolTip",
+                     "Qt.createComponent", "Qt.include", "FontLoader", "BorderImage", "AnimatedSprite", "MediaPlayer", "Video", "SoundEffect"]
   const files = ["Logic.js", ...list(".", ".qml"), ...list("components", ".qml")].map((f) => f.replace(/^\.\//, ""))
   // Only code counts: a comment may name an API to say it is not used.
   const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
@@ -140,6 +141,34 @@ describe("APIs that run or load from a string", () => {
     const section = md.split("### APIs not allowed")[1].split("\n#")[0]
     const listed = [...section.matchAll(/^- `([^`]+)`$/gm)].map((m) => m[1])
     assert.deepEqual(listed, forbidden)
+  })
+})
+
+describe("the journal", () => {
+  // docs/development.md, "Security": a log line names an event by its id, never by its title,
+  // place or calendar, which belong to whoever owns the calendar. A check of each log line,
+  // not of the data flow: a value copied to a variable first would pass, so review still counts.
+  for (const file of ["Service.qml", "Alert.qml", ...list("components", ".qml")])
+    test(file + " logs no title, place or calendar name", () => {
+      read(file).split("\n").forEach((l, i) => {
+        if (/\b(root\.log|console\.log)\(/.test(l))
+          assert.doesNotMatch(l, /\.(title|location|calendar)\b/, file + ":" + (i + 1) + " logs calendar text")
+      })
+    })
+})
+
+describe("the card's input guard", () => {
+  // docs/development.md, "Security": every key and click that can join, dismiss or flip the
+  // mode asks guardedNow() at the moment of the input. ActionButton has no guard of its own.
+  test("every input handler of Alert.qml asks guardedNow()", () => {
+    const lines = read("Alert.qml").split("\n")
+    const handlers = lines.map((l, i) => [i, l]).filter(([, l]) => /\b(onClicked|onActivated|onToggled|Keys\.onPressed)\s*:/.test(l))
+    assert.ok(handlers.length >= 5, "found the handlers")
+    for (const [i, l] of handlers) {
+      if (/onClicked:\s*\{\s*\}/.test(l)) continue   // the card's own area only stops clicks reaching the veil
+      const body = lines.slice(i, i + 4).join("\n")
+      assert.match(body, /guardedNow\(\)/, "Alert.qml:" + (i + 1) + " handles input without guardedNow()")
+    }
   })
 })
 

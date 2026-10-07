@@ -50,6 +50,11 @@ describe("payload between Service and Alert", () => {
     assert.equal(p.mode, "professional")
     assert.equal(p.dim, null)
     assert.equal(p.url, "")
+    // The config's ranges hold for a payload too.
+    const far = L.normalizePayload({ leadSeconds: 1e12, tenseSeconds: 3601, dim: 5 })
+    assert.deepEqual([far.leadSeconds, far.tenseSeconds, far.dim], [60, 15, null])
+    const edge = L.normalizePayload({ leadSeconds: 3600, tenseSeconds: 0, dim: 1 })
+    assert.deepEqual([edge.leadSeconds, edge.tenseSeconds, edge.dim], [3600, 0, 1])
   })
 
   test("themes in a payload are cleaned again", () => {

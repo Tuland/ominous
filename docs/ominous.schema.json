@@ -11,7 +11,10 @@
     "calendars": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": [
+          "string",
+          "number"
+        ]
       },
       "default": [],
       "description": "Calendars that alert, by name or id (see `omacal calendars`). Empty = all of them."
@@ -67,14 +70,14 @@
       ]
     },
     "leadSeconds": {
-      "type": "integer",
+      "type": "number",
       "minimum": 0,
       "maximum": 3600,
       "default": 60,
       "description": "Seconds before the start when the card appears (0-3600)."
     },
     "tenseSeconds": {
-      "type": "integer",
+      "type": "number",
       "minimum": 0,
       "maximum": 3600,
       "default": 15,

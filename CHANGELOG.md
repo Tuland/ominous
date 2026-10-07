@@ -32,8 +32,9 @@ All notable changes to Ominous are listed here. The format follows
 - **A link to a host that is not in `joinHosts` opens with Dismiss selected**, so `Enter` no
   longer opens it; choose Join on purpose. If you use a service outside the default, add its
   host to `joinHosts`.
-- `leadSeconds` and `dim` set to `null`, `""` or a boolean no longer read as `0` or `1`: the
-  default is used and `status` lists the value in `ignoredValues`.
+- `leadSeconds` set to `null`, `""` or a boolean, and `dim` set to `""` or a boolean, no longer
+  read as `0` or `1`: the default is used and `status` lists the value in `ignoredValues`.
+  (`dim: null` still means the theme's scrim.)
 - The Join button shows the host the browser really opens ("Join on evil.example"), not
   "Join on browser". A link such as `https://meet.google.com@evil.example/` is read as
   `evil.example`. A character outside plain ASCII in a host is shown as its `\uXXXX` escape, and
@@ -41,13 +42,24 @@ All notable changes to Ominous are listed here. The format follows
 - The card's first-second input guard now waits for a pause: a key pressed while the card is
   guarded starts the second again, so someone still typing when the card appears cannot join
   or dismiss it with a stray `Enter` or space.
+- Invitations you have not answered share one card per minute: once a card fires, every
+  unanswered meeting that starts within the next minute counts as alerted. A meeting you
+  accepted or organize always gets its own card, and comes first at the same time.
+- An `ominous.json` that exists but cannot be read (permissions, a directory) is reported in
+  `configError` and the log; a missing file still is not.
+- The JSON Schema accepts what Ominous accepts: decimal seconds and numbers in `calendars`.
 
 ### Security
 - A meeting link that contains `$` is ignored. The browser is started through `systemd-run`,
   which expands `${VAR}` in its arguments, so a link such as
   `https://evil.example${HOME}@meet.google.com/` could be shown as Meet and open
   `evil.example`, or send environment values to the site. Links with a control character, a `%`
-  escape in the host, or more than 2048 characters are ignored too.
+  escape in the host, or more than 2048 characters are ignored too, and so are links with
+  `--private`, which the browser launcher rewrites inside the link
+  (`meet--private.example` would open `meet--incognito.example`).
+- A flood of invitations no longer takes the screen and the keyboard every five seconds:
+  anyone can send an invitation, and a calendar may add it until it is declined. It now gives
+  at most one card a minute, however the invitations' starts are spread.
 - A meeting link with no host (`https:///example.com`) is no longer shown as a Join button, a
   host with anything but letters, digits, hyphens and dots is never recognized, and the title,
   place and calendar name are cut to one line (line breaks and text-direction overrides become
@@ -56,6 +68,9 @@ All notable changes to Ominous are listed here. The format follows
   like markup was rendered as rich text, so the owner of a shared calendar could make the card
   load an external image (`<img src="https://...">`) when an alert opened. Every text on the
   card is now plain text, and a test keeps it so.
+- Theme captions are cleaned like calendar text and clipped to their line, and a theme with
+  more than 64 frames in a phase has no sprite; an alert payload sent by hand gets the config's
+  ranges.
 
 ## [0.2.0] - 2026-10-05
 

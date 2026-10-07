@@ -130,17 +130,34 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 | Source | Used for | Rule | Held by |
 |---|---|---|---|
 | OmaCal agenda: title, place, calendar name, link | Text on the card | Every `Text`, `Label`, `TextEdit` and `TextArea` is `Text.PlainText` (rich text can load remote images); title, place and calendar name are one cleaned line of bounded length (`Logic.cleanText`), so line breaks and direction overrides cannot reshape or reorder the card | `tests/style.test.mjs`, `tests/payload.test.mjs` |
-| OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, at most 2048 characters, with a host, no spaces, `\`, control characters, `$` or `%` in the host) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened, with every character outside printable ASCII escaped and the length capped (`Logic.linkHost`, `Logic.displayHost`, `Logic.joinTarget`); "recognized" means the service, not the meeting | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
-| OmaCal agenda: title and link | The journal and `status` | Only the event id is logged; `status` never prints a title | `tests/live.sh` |
-| IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again, `joinHosts` included | `tests/payload.test.mjs` |
+| OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, at most 2048 characters, with a host, no spaces, `\`, control characters; no `$` or `--private` anywhere, no `%` in the host) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened, with every character outside printable ASCII escaped and the length capped (`Logic.linkHost`, `Logic.displayHost`, `Logic.joinTarget`); "recognized" means the service, not the meeting | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
+| OmaCal agenda: title and link | The journal and `status` | Only the event id is logged, quoted (`Logic.quoted`); `status` never prints a title | `tests/style.test.mjs` (log lines, a check of each line, not of the data flow), `tests/live.sh` (`status`) |
+| OmaCal agenda: number of events | The card taking the screen and the keyboard | One card per group: when an alert fires, every unconfirmed event (not accepted, not organized) starting within the next minute counts as alerted (`Logic.claimDue`), so a flood gives at most one card a minute; a confirmed event always gets its own card and wins a tie; a start a `Date` cannot hold is not alertable | `tests/agenda.test.mjs` |
+| Keys while the card opens | Joining or dismissing | Input is ignored for a second after the card opens and after every key pressed while ignored, decided at the moment of the input (`Logic.isGuarded`) | `tests/card.test.mjs`, `tests/style.test.mjs` (every input handler of `Alert.qml` asks `guardedNow()`), `tests/live.sh` (keys) |
+| IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again with the config's ranges (`dim` 0 to 1, seconds 0 to 3600), `joinHosts` included | `tests/payload.test.mjs` |
 | `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.checkConfig` (a refused value falls back to its default and is reported in `ignoredValues`), `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
-| User theme files | Colors and text of a sprite | `Logic.normalizeTheme`: colors only, sizes capped | `tests/themes.test.mjs` |
+| User theme files | Colors, caption and sprite | `Logic.normalizeTheme`: colors only (at most 40 characters), captions one cleaned line of 80 characters (`Logic.cleanText`) drawn clipped, sprites at most 32x32 cells and 64 frames per phase | `tests/themes.test.mjs` |
 | Long text from a calendar | The card's size | Elided or capped (title lines, captions, sprite size) | `tests/live.sh` (long title) |
 
-The browser is started by `omarchy-launch-browser`, which runs it through `systemd-run`; systemd
-expands `${VAR}` in the arguments, so a `$` in a link could change the host the browser opens.
-`Logic.safeUrl` refuses any link with a `$`. Title, place and calendar name are drawn clipped to
-their lines, so stacked combining marks cannot cover the buttons.
+The browser is started by `omarchy-launch-browser`, which runs
+`systemd-run … uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"`. Each layer was read
+for what it could make of a link:
+
+- `systemd-run` expands `${VAR}` in the arguments, so a `$` could change the host the browser
+  opens; `uwsm-app` starts the browser through a second `systemd-run`, with the same expansion.
+  `Logic.safeUrl` refuses any link with a `$`.
+- The launcher's bash substitution replaces the first `--private` inside every argument, the
+  link included, with the browser's private flag (`meet--private.example` would open
+  `meet--incognito.example`). `Logic.safeUrl` refuses any link with `--private`.
+- `uwsm-app` runs the command its daemon sends back with `eval`, but the daemon builds it with
+  Python's `shlex.join`, which quotes every argument: no shell syntax in a link reaches a shell.
+- The link always starts with `https://`, so it cannot be read as an option.
+
+Invitations a minute or more apart still alert one by one, as any calendar reminder does: the
+grouping bounds a flood at one card a minute, it does not stop it.
+
+Title, place, calendar name and caption are drawn clipped to their lines, so stacked combining
+marks cannot cover the buttons.
 
 The IPC is reachable only by the same user, who already has full access, so it is not a trust
 boundary; its payload is still checked, so a hand-made one behaves like a real alert.
@@ -158,6 +175,14 @@ None of these is in the plugin, and `tests/style.test.mjs` fails when one appear
 - `AnimatedImage`
 - `XMLHttpRequest`
 - `ToolTip`
+- `Qt.createComponent`
+- `Qt.include`
+- `FontLoader`
+- `BorderImage`
+- `AnimatedSprite`
+- `MediaPlayer`
+- `Video`
+- `SoundEffect`
 
 `ToolTip` is Qt's own, whose text can be read as rich text: use the shell's `PanelToolTip`, which shows plain text.
 To use one, argue it in this section first (what data reaches it and why that is safe), and

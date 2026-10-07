@@ -62,7 +62,10 @@ apply_palette() {
 [[ -d $CUR/theme ]] || { echo "FAIL no current Omarchy theme at $CUR/theme"; exit 1; }
 omarchy-shell ominous status >/dev/null 2>&1 || { echo "FAIL the ominous plugin does not answer"; exit 1; }
 manifest > "$SNAP/before.txt"
-cp -a "$CUR/theme" "$SNAP/theme"; cp -a "$CUR/theme.name" "$SNAP/theme.name"
+# Without a full copy the restore trap would delete the theme it cannot put back: stop here.
+if ! cp -a "$CUR/theme" "$SNAP/theme" || ! cp -a "$CUR/theme.name" "$SNAP/theme.name"; then
+  echo "FAIL could not copy the current theme to $SNAP; nothing was changed"; exit 1
+fi
 ORIGINAL=$(omarchy-theme-current)
 echo "saved: $ORIGINAL ($(wc -l < "$SNAP/before.txt") manifest lines) -> $SNAP"
 

@@ -355,6 +355,12 @@ describe("values the config ignores", () => {
     assert.deepEqual(ignoredOf({ themes: { playful: "../x", professional: "classic" } }), ['themes.playful: "../x"'])
     assert.deepEqual(ignoredOf({ joinHosts: "zoom.us" }), ['joinHosts: "zoom.us"'])
     assert.deepEqual(ignoredOf({ themes: { Playful: "boss", profesional: "classic" } }), ['themes.Playful: "boss"', 'themes.profesional: "classic"'])
+    // A key name from the file is escaped: the config output must read back.
+    const p = L.parseConfig('{"themes": {"a\\nb": "x"}, "leadSeconds": 30}')
+    assert.deepEqual([...p.ignored], ['themes."a\\nb": "x"'])
+    const back = L.parseConfig(L.formatConfig(p.config, p.unknownKeys, p.ignored))
+    assert.equal(back.error, "")
+    assert.equal(back.config.leadSeconds, 30)
   })
 
   test("a bad list entry is named, the good ones stay", () => {

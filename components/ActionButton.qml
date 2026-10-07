@@ -4,16 +4,14 @@ import qs.Commons
 /**
  * One of the card's two buttons.
  *
- * In: `label`; `current`, the keyboard selection; `guarded`, true during the card's first
- * second, when clicks are ignored; the colors.
- * Out: `activated()` on a click that is not guarded.
+ * In: `label`; `current`, the keyboard selection; the colors.
+ * Out: `activated()` on a click; the card decides whether its input guard lets it through.
  */
 Rectangle {
   id: btn
 
   property string label: ""
   property bool current: false
-  property bool guarded: false
   property color accent: Color.accent
   property color cardColor: Color.notifications.background
   property color textColor: Color.notifications.text
@@ -42,6 +40,6 @@ Rectangle {
     id: btnArea
     anchors.fill: parent
     hoverEnabled: true
-    onClicked: if (!btn.guarded) btn.activated()
+    onClicked: btn.activated()
   }
 }

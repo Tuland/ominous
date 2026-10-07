@@ -141,6 +141,14 @@ Item {
       root.shell.hide((root.manifest && root.manifest.id) || "io.github.tuland.ominous")
   }
 
+  /**
+   * Whether input is ignored right now. Keys and clicks decide with the clock of the moment, not
+   * with `guarded`, which follows the 250 ms tick and could swallow a key just after a pause.
+   */
+  function guardedNow(): bool {
+    return Logic.isGuarded(root.openedAtMs, root.guardKeyMs, Date.now(), root.inputGuardMs)
+  }
+
   /** Opens the join link in the browser, then dismisses. Does nothing without a link. */
   function join(): void {
     if (root.url === "") return
@@ -208,7 +216,7 @@ Item {
 
     MouseArea {
       anchors.fill: parent
-      onClicked: if (!root.guarded) root.dismiss()
+      onClicked: if (!root.guardedNow()) root.dismiss()
     }
 
     BorderSurface {
@@ -234,7 +242,7 @@ Item {
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
           event.accepted = true
-          if (root.guarded) {
+          if (root.guardedNow()) {
             root.guardKeyMs = Date.now()
             return
           }
@@ -307,7 +315,7 @@ Item {
             textColor: root.textColor
             mutedColor: root.mutedColor
             accent: root.signalColor
-            onToggled: if (!root.guarded) root.toggleMode()
+            onToggled: if (!root.guardedNow()) root.toggleMode()
           }
         }
 
@@ -365,6 +373,7 @@ Item {
           font.pixelSize: Style.font.title
           maximumLineCount: 1
           elide: Text.ElideRight
+          clip: true
         }
 
         Row {
@@ -374,12 +383,11 @@ Item {
             visible: root.url !== ""
             label: "Join on " + root.target.label
             current: root.selected === 0
-            guarded: root.guarded
             accent: root.signalColor
             cardColor: root.cardColor
             textColor: root.textColor
             mutedColor: root.mutedColor
-            onActivated: root.join()
+            onActivated: if (!root.guardedNow()) root.join()
           }
 
           LinkNotice {
@@ -396,12 +404,11 @@ Item {
           ActionButton {
             label: "Dismiss"
             current: root.selected === 1
-            guarded: root.guarded
             accent: root.signalColor
             cardColor: root.cardColor
             textColor: root.textColor
             mutedColor: root.mutedColor
-            onActivated: root.dismiss()
+            onActivated: if (!root.guardedNow()) root.dismiss()
           }
         }
 

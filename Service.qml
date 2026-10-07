@@ -123,7 +123,15 @@ Item {
     printErrors: false
     onFileChanged: reload()
     onLoaded: root.loadConfig(text())
-    onLoadFailed: root.loadConfig("")
+    // A missing file is the normal case: the defaults, silently. Any other failure
+    // (permissions, a directory) is reported, as a broken file is.
+    onLoadFailed: function(error) {
+      root.loadConfig("")
+      if (error !== FileViewError.FileNotFound) {
+        root.configError = "config cannot be read, using defaults"
+        root.log(root.configError)
+      }
+    }
   }
 
   // A file can only be watched once its directory exists, so create the state

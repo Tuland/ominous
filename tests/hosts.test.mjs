@@ -108,8 +108,8 @@ describe("join hosts", () => {
     assert.match(tip, /joinHosts/)
     assert.match(tip, /~\/\.config\/omarchy\/ominous\.json/)
     assert.match(tip, /make Join the default/)
-    assert.doesNotMatch(tip, /non-Latin/)
-    assert.match(L.unknownLinkTip("m\u0435et.google.com"), /non-Latin/)
+    assert.doesNotMatch(tip, /outside plain ASCII/)
+    assert.match(L.unknownLinkTip("m\u0435et.google.com"), /outside plain ASCII/)
   })
 
   test("hosts that mimic another are shown escaped and never recognized", () => {
@@ -117,7 +117,7 @@ describe("join hosts", () => {
       const t = L.joinTarget("https://" + host + "/x", defaults)
       assert.equal(t.recognized, false, host)
       assert.doesNotMatch(t.label, /[^\x21-\x7e\u2026 ]/, "label of " + host + " has a raw character")
-      assert.match(L.unknownLinkTip(t.host), /non-Latin/)
+      assert.match(L.unknownLinkTip(t.host), /outside plain ASCII/)
       assert.doesNotMatch(L.unknownLinkTip(t.host), /[^\x20-\x7e\n\u2026]/)
     }
   })
@@ -173,6 +173,12 @@ describe("links with no real host", () => {
     for (const url of ["https://evil.example${HOME}@meet.google.com/abc", "https://meet.google.com/x?u=${USER}", "https://meet.google.com/$HOME"])
       assert.equal(L.safeUrl(url), "", url)
     assert.equal(L.joinTarget("https://evil.example${HOME}@meet.google.com/abc", defaults).label, "")
+  })
+
+  test("a link with --private is no link: the browser launcher rewrites it in every argument", () => {
+    for (const url of ["https://meet--private.example.com/x", "https://meet.google.com/abc?x=--private"])
+      assert.equal(L.safeUrl(url), "", url)
+    assert.equal(L.safeUrl("https://meet.google.com/abc-private"), "https://meet.google.com/abc-private")
   })
 
   test("a host with a % escape is no link: the browser would open the decoded host", () => {

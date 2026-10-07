@@ -18,6 +18,12 @@ Which meetings alert:
 - With `onlyWithLink`, only meetings with an `https://` join link alert.
 - A meeting that started less than two minutes ago still alerts, to cover a suspend, a shell
   restart or a late sync.
+- Invitations you have not answered share one card per minute: once a card fires, every
+  unanswered meeting that starts at the same time or within the next minute counts as alerted.
+  Anyone can send you an invitation, and a calendar may add it until you decline it, so a flood
+  of them gives at most one card a minute, not one every few seconds. A meeting you accepted or
+  organize always gets its own card, and comes first. Invitations a minute or more apart still
+  alert one by one, as any calendar reminder does.
 
 ## On the card
 

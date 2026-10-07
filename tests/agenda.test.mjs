@@ -50,6 +50,58 @@ describe("alerting once", () => {
     assert.ok(L.claimDue([ev({ startMs: now + 50_000 })], now, cfg, fired))                 // same event id, new start
   })
 
+  // Invitations nobody answered, as a stranger's would be.
+  const invite = (o) => ev({ response: "needsAction", organizer: false, ...o })
+  const alertsOver = (events, seconds) => {
+    const fired = {}, shown = []
+    for (let t = -60_000; t <= seconds * 1000; t += 5_000) {
+      const e = L.claimDue(events, now + t, cfg, fired)
+      if (e) shown.push(e.eventId)
+    }
+    return shown
+  }
+
+  test("one card per group: a flood of same-minute invitations alerts once", () => {
+    assert.equal(alertsOver(Array.from({ length: 50 }, (_, i) => invite({ eventId: i, startMs: now })), 300).length, 1)
+  })
+
+  test("invitations spread a few seconds apart give at most one card a minute", () => {
+    for (const step of [1_000, 5_000, 30_000, 59_000]) {
+      const flood = Array.from({ length: 40 }, (_, i) => invite({ eventId: i, startMs: now + i * step }))
+      const span = 39 * step / 1000
+      assert.ok(alertsOver(flood, span + 120).length <= Math.ceil(span / 60) + 1, "step " + step)
+    }
+  })
+
+  test("an accepted or organized meeting always gets its own card, and goes first", () => {
+    const real = ev({ eventId: "real", startMs: now + 10_000 }), mine = ev({ eventId: "mine", response: "needsAction", organizer: true, startMs: now + 20_000 })
+    const spam = Array.from({ length: 5 }, (_, i) => invite({ eventId: "spam" + i, startMs: now + i * 1_000 }))
+    const shown = alertsOver([...spam, real, mine], 120)
+    assert.ok(shown.includes("real") && shown.includes("mine"), String(shown))
+    const tie = alertsOver([invite({ eventId: "spam", startMs: now }), ev({ eventId: "real", startMs: now })], 120)
+    assert.equal(tie[0], "real")
+  })
+
+  test("a meeting in its grace does not swallow the next one", () => {
+    const late = invite({ eventId: "late", startMs: now - 90_000 }), next = invite({ eventId: "next", startMs: now + 40_000 })
+    const fired = {}
+    assert.equal(L.claimDue([late, next], now, cfg, fired)?.eventId, "late")
+    assert.equal(L.claimDue([late, next], now + 5_000, cfg, fired)?.eventId, "next")
+  })
+
+  test("a meeting that enters its window later still alerts", () => {
+    const fired = {}
+    const ten = ev({ eventId: 1, startMs: now + 30_000 }), later = ev({ eventId: 2, startMs: now + 30 * 60_000 })
+    assert.equal(L.claimDue([ten, later], now, cfg, fired)?.eventId, 1)
+    assert.equal(L.claimDue([ten, later], now + 29 * 60_000 + 30_000, cfg, fired)?.eventId, 2)
+  })
+
+  test("a start a Date cannot hold is not alertable, and status still answers", () => {
+    for (const startMs of [1e300, "1e400", Infinity, 8.64e15 + 1])
+      assert.equal(L.isAlertable(ev({ startMs }), cfg), false, String(startMs))
+    assert.doesNotThrow(() => L.statusSnapshot([ev({ startMs: 1e300 })], cfg, now))
+  })
+
   test("nothing due leaves no trace", () => {
     const fired = {}
     assert.equal(L.claimDue([ev({ startMs: now + 600_000 })], now, cfg, fired), null)

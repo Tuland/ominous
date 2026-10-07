@@ -6,7 +6,7 @@
 //   Constants
 //   Values and links ......... numberOrNaN, quoted, cleanText, isThemeName, safeUrl, hostOf, linkHost, displayHost, shortHost, checkHostList, hostList, hostIn, joinTarget, unknownLinkTip
 //   Config and saved state ... checkConfig, normalizeConfig, stripJsonc, parseConfig, inlineJson, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
-//   Agenda ................... isAlertable, eventKey, nextDue, claimDue, pruneFired, statusSnapshot
+//   Agenda ................... isAlertable, isConfirmed, eventKey, nextDue, isDueNow, claimDue, pruneFired, statusSnapshot
 //   Timing on the card ....... phase, progress, countdown, isOver
 //   Card input ............... isGuarded, initialSelection, nextSelection, activation
 //   Themes ................... normalizeSprite, normalizeTheme, pickTheme, frameAt
@@ -50,7 +50,7 @@ var OPTIONAL_JOIN_HOSTS = [
 var CONFIG_FIELDS = [
   { key: "calendars", default: [],
     description: "Calendars that alert, by name or id (see `omacal calendars`). Empty = all of them.",
-    schema: { type: "array", items: { type: "string" } } },
+    schema: { type: "array", items: { type: ["string", "number"] } } },
   { key: "onlyWithLink", default: false,
     description: "true = alert only for meetings with an https join link.",
     schema: { type: "boolean" } },
@@ -59,10 +59,10 @@ var CONFIG_FIELDS = [
     schema: { type: "array", items: { type: "string", pattern: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+\\.?$" } } },
   { key: "leadSeconds", default: 60,
     description: "Seconds before the start when the card appears (0-3600).",
-    schema: { type: "integer", minimum: 0, maximum: 3600 } },
+    schema: { type: "number", minimum: 0, maximum: 3600 } },
   { key: "tenseSeconds", default: 15,
     description: "Seconds before the start when the card turns tense (0-3600); 0 = never.",
-    schema: { type: "integer", minimum: 0, maximum: 3600 } },
+    schema: { type: "number", minimum: 0, maximum: 3600 } },
   { key: "dim", default: null,
     description: "Opacity of the veil behind the card, 0-1; null = the theme's own.",
     schema: { type: ["number", "null"], minimum: 0, maximum: 1 } },
@@ -98,8 +98,13 @@ var PHASES = ["relaxed", "tense", "angry"]
 // A meeting that started at most this long ago still alerts: covers a
 // suspend, a shell restart or an OmaCal sync that lands a little late.
 var GRACE_SECONDS = 120
+// Invitations the user has not confirmed that start within this of an alert share its card,
+// so a flood of them gives at most one card a minute, however their starts are spread.
+var GROUP_SECONDS = 60
 
 var MAX_SPRITE = 32
+// Frames per phase: the shipped themes use 3; a theme travels in every alert's payload.
+var MAX_FRAMES = 64
 var DEFAULT_FRAME_MS = 500
 
 var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset [professional|playful]"'
@@ -137,6 +142,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {string} conference  The join link, if any.
  * @property {boolean} allDay
  * @property {string} response  The user's answer, e.g. "declined".
+ * @property {boolean} organizer  Whether the user organizes it.
  *
  * @typedef {Object} PhaseLook  One phase of a theme.
  * @property {string} color  A color token, or "" for the card's default.
@@ -222,7 +228,7 @@ function isThemeName(name) {
  * result is cut at `max` characters. A calendar's owner cannot stretch the card with line
  * breaks or reorder what is shown.
  *
- * @param {*} value The title, place or calendar name.
+ * @param {*} value The title, place or calendar name, or a theme caption.
  * @param {number} max The most characters to keep.
  * @returns {string} One line, possibly empty.
  */
@@ -242,11 +248,15 @@ function cleanText(value, max) {
  *     with a host, or when it holds white space, a backslash, a control character or `$`: the
  *     browser is started through systemd, which expands `${VAR}` in its arguments, so a `$`
  *     could change the host the browser opens. A host with a `%` escape is refused too, since
- *     the browser would decode it into another host than the one shown.
+ *     the browser would decode it into another host than the one shown, and so is `--private`
+ *     anywhere: omarchy-launch-browser rewrites it inside every argument
+ *     (`"${@/--private/$private_flag}"`), so `meet--private.example` would open
+ *     `meet--incognito.example`.
  */
 function safeUrl(url) {
   var s = String(url || "")
   if (s.length > 2048 || !/^https:\/\/[^\s\\\x00-\x1f\x7f-\x9f$]+$/i.test(s)) return ""
+  if (s.indexOf("--private") >= 0) return ""
   var host = hostOf(s)
   return host !== "" && host.indexOf("%") < 0 ? s : ""
 }
@@ -387,7 +397,7 @@ function unknownLinkTip(host) {
   var shown = displayHost(host)
   var lines = ["Link not recognized:", shortHost(shown, 64), "Add it to joinHosts in", "~/.config/omarchy/ominous.json",
                "to make Join the default for it."]
-  if (shown !== host) lines.push("It has non-Latin characters", "and may imitate another address.")
+  if (shown !== host) lines.push("It has characters outside plain ASCII", "and may imitate another address.")
   return lines.join("\n")
 }
 
@@ -446,7 +456,8 @@ function checkConfig(raw) {
   if (has("themes")) {
     if (raw.themes && typeof raw.themes === "object" && !Array.isArray(raw.themes))
       Object.keys(raw.themes).forEach(function(/** @type {string} */ m) {
-        if (MODES.indexOf(/** @type {Mode} */ (m)) < 0) ignore("themes." + m, raw.themes[m])
+        // The name comes from the file: anything but a plain word is shown quoted and escaped.
+        if (MODES.indexOf(/** @type {Mode} */ (m)) < 0) ignore("themes." + (/^[\w-]+$/.test(m) ? m : quoted(m)), raw.themes[m])
         else if (isThemeName(raw.themes[m])) cfg.themes[/** @type {Mode} */ (m)] = raw.themes[m]
         else ignore("themes." + m, raw.themes[m])
       })
@@ -695,7 +706,9 @@ function resolveThemes(saved, cfg) {
  */
 function isAlertable(ev, cfg) {
   if (!ev || ev.allDay || ev.response === "declined") return false
-  if (!(Number(ev.startMs) > 0)) return false
+  // A start a Date can hold: status prints it with toISOString, which throws beyond 8.64e15.
+  var start = Number(ev.startMs)
+  if (!(start > 0 && start <= 8.64e15)) return false
   // The same rule as the Join button: only an https conference link counts.
   if (cfg.onlyWithLink && safeUrl(ev.conference) === "") return false
   if (cfg.calendars.length === 0) return true
@@ -715,7 +728,19 @@ function eventKey(ev) {
 }
 
 /**
- * The earliest alertable event inside its alert window that has not fired yet.
+ * Whether the user confirmed an event: accepted it or organizes it. Anyone can send an
+ * invitation; only a confirmed event is sure to be the user's own.
+ *
+ * @param {AgendaEvent} ev The event.
+ * @returns {boolean}
+ */
+function isConfirmed(ev) {
+  return ev.response === "accepted" || ev.organizer === true
+}
+
+/**
+ * The earliest alertable event inside its alert window that has not fired yet; at the same
+ * start, a confirmed one first, so an invitation cannot take a real meeting's place.
  *
  * @param {AgendaEvent[]} events The agenda.
  * @param {number} nowMs Now, epoch milliseconds.
@@ -727,17 +752,34 @@ function nextDue(events, nowMs, cfg, fired) {
   var best = null
   for (var i = 0; i < (events || []).length; i++) {
     var ev = events[i]
-    if (!isAlertable(ev, cfg) || fired[eventKey(ev)]) continue
-    var start = Number(ev.startMs)
-    if (nowMs < start - cfg.leadSeconds * 1000 || nowMs >= start + GRACE_SECONDS * 1000) continue
-    if (!best || start < Number(best.startMs)) best = ev
+    if (fired[eventKey(ev)] || !isDueNow(ev, nowMs, cfg)) continue
+    var start = Number(ev.startMs), bestStart = best ? Number(best.startMs) : 0
+    if (!best || start < bestStart || (start === bestStart && isConfirmed(ev) && !isConfirmed(best))) best = ev
   }
   return best
 }
 
 /**
+ * Whether an event is alertable and inside its alert window: from `leadSeconds` before its
+ * start to the end of the grace after it.
+ *
+ * @param {AgendaEvent} ev The event.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {Config} cfg The config.
+ * @returns {boolean}
+ */
+function isDueNow(ev, nowMs, cfg) {
+  if (!isAlertable(ev, cfg)) return false
+  var start = Number(ev.startMs)
+  return nowMs >= start - cfg.leadSeconds * 1000 && nowMs < start + GRACE_SECONDS * 1000
+}
+
+/**
  * The next event to alert for, marked in `fired` so it alerts once even though it stays in
- * its window.
+ * its window. Every alertable event the user has not confirmed that starts within
+ * GROUP_SECONDS after it is marked too: one card per group, so a flood of invitations cannot
+ * take the keyboard every five seconds, however their starts are spread. A confirmed event
+ * always gets its own card.
  *
  * @param {AgendaEvent[]} events The agenda.
  * @param {number} nowMs Now, epoch milliseconds.
@@ -747,7 +789,14 @@ function nextDue(events, nowMs, cfg, fired) {
  */
 function claimDue(events, nowMs, cfg, fired) {
   var ev = nextDue(events, nowMs, cfg, fired)
-  if (ev) fired[eventKey(ev)] = Number(ev.startMs)
+  if (!ev) return null
+  var start = Number(ev.startMs)
+  fired[eventKey(ev)] = start
+  for (var i = 0; i < events.length; i++) {
+    var other = events[i], s = Number(other.startMs)
+    if (isAlertable(other, cfg) && !isConfirmed(other) && s >= start && s < start + GROUP_SECONDS * 1000)
+      fired[eventKey(other)] = s
+  }
   return ev
 }
 
@@ -924,7 +973,7 @@ function normalizeSprite(rawPalette, rawPhases) {
     var rawFrames = rawPhases[PHASES[i]] && rawPhases[PHASES[i]].frames
     frames[PHASES[i]] = []
     if (rawFrames === undefined) continue
-    if (!Array.isArray(rawFrames) || rawFrames.length === 0) return null
+    if (!Array.isArray(rawFrames) || rawFrames.length === 0 || rawFrames.length > MAX_FRAMES) return null
     for (var f = 0; f < rawFrames.length; f++) {
       var frame = rawFrames[f]
       if (!Array.isArray(frame) || frame.length < 1 || frame.length > MAX_SPRITE) return null
@@ -960,8 +1009,7 @@ function normalizeTheme(raw) {
     var p = rawPhases[name] && typeof rawPhases[name] === "object" ? rawPhases[name] : {}
     var ms = numberOrNaN(p.frameMs)
     var color = typeof p.color === "string" ? p.color.trim() : ""
-    var caption = typeof p.caption === "string" || typeof p.caption === "number"
-                  ? String(p.caption).replace(/\s+/g, " ").trim().slice(0, 80) : ""
+    var caption = typeof p.caption === "string" || typeof p.caption === "number" ? cleanText(String(p.caption), 80) : ""
     theme.phases[name] = {
       color: color.length <= 40 ? color : "",
       caption: caption,
@@ -1155,9 +1203,10 @@ function normalizePayload(p) {
   return {
     title: cleanText(p.title, 200) || "Meeting", startMs: Number(p.startMs) || 0, endMs: Number(p.endMs) || 0,
     location: cleanText(p.location, 200), calendar: cleanText(p.calendar, 80), url: safeUrl(p.url),
-    dim: typeof p.dim === "number" ? p.dim : null,
-    leadSeconds: isFinite(lead) && lead >= 0 ? lead : DEFAULTS.leadSeconds,
-    tenseSeconds: isFinite(tense) && tense >= 0 ? tense : DEFAULTS.tenseSeconds,
+    // The config's ranges again: a payload can come from any caller of the shell's IPC.
+    dim: typeof p.dim === "number" && p.dim >= 0 && p.dim <= 1 ? p.dim : null,
+    leadSeconds: isFinite(lead) && lead >= 0 && lead <= 3600 ? lead : DEFAULTS.leadSeconds,
+    tenseSeconds: isFinite(tense) && tense >= 0 && tense <= 3600 ? tense : DEFAULTS.tenseSeconds,
     mode: p.mode === "playful" ? "playful" : "professional",
     joinHosts: Array.isArray(p.joinHosts) ? hostList(p.joinHosts) : DEFAULTS.joinHosts.slice(),
     // normalizeTheme({}) is never null: an empty object is a valid, empty theme.

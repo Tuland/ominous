@@ -35,6 +35,23 @@ describe("theme files", () => {
     assert.equal(L.normalizeTheme({ phases: { tense: { frameMs: null } } }).phases.tense.frameMs, 500)
   })
 
+  test("a caption is one clean line, like calendar text", () => {
+    const t = L.normalizeTheme({ phases: { angry: { caption: "a\u202eb\nc" + "\u0301".repeat(60) } } })
+    assert.equal(t.phases.angry.caption.startsWith("a b c"), true)
+    assert.doesNotMatch(t.phases.angry.caption, /[\u202e\n]/)
+    assert.equal(L.normalizeTheme({ phases: { angry: { caption: 0 } } }).phases.angry.caption, "0")
+  })
+
+  test("more than 64 frames in a phase: no sprite, the rest still applies", () => {
+    const frames = (n) => Array.from({ length: n }, () => ["kk", "oo"])
+    const ok = L.normalizeTheme({ palette: { k: "#000000", o: "#ffffff" }, phases: { tense: { frames: frames(64) } } })
+    assert.equal(ok.phases.tense.frames.length, 64)
+    const big = L.normalizeTheme({ palette: { k: "#000000", o: "#ffffff" }, phases: { tense: { color: "urgent", caption: "Hi", frames: frames(20000) } } })
+    assert.equal(big.cols, 0)
+    assert.equal(big.phases.tense.frames.length, 0)
+    assert.equal(big.phases.tense.caption, "Hi")
+  })
+
   test("colors only, no sprite", () => {
     const plain = L.normalizeTheme({ progress: true, phases: { angry: { color: "urgent" } } })
     assert.equal(plain.cols, 0)
