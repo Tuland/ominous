@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Tuland/ominous/main/docs/ominous.schema.json",
+  "title": "Ominous settings (ominous.json)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Where this schema is published; editors use it, Ominous ignores it."
+    },
+    "calendars": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Calendars that alert, by name or id (see `omacal calendars`). Empty = all of them."
+    },
+    "onlyWithLink": {
+      "type": "boolean",
+      "default": false,
+      "description": "true = alert only for meetings with an https join link."
+    },
+    "leadSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600,
+      "default": 60,
+      "description": "Seconds before the start when the card appears (0-3600)."
+    },
+    "tenseSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600,
+      "default": 15,
+      "description": "Seconds before the start when the card turns tense (0-3600); 0 = never."
+    },
+    "dim": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "default": null,
+      "description": "Opacity of the veil behind the card, 0-1; null = the theme's own."
+    },
+    "mode": {
+      "enum": [
+        "professional",
+        "playful"
+      ],
+      "default": "professional",
+      "description": "Mode until you switch on the card (M): professional or playful."
+    },
+    "themes": {
+      "type": "object",
+      "properties": {
+        "professional": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$"
+        },
+        "playful": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,40}$"
+        }
+      },
+      "additionalProperties": false,
+      "default": {
+        "professional": "classic",
+        "playful": "marine"
+      },
+      "description": "Theme of each mode (see `omarchy-shell ominous themes`)."
+    }
+  },
+  "additionalProperties": true
+}

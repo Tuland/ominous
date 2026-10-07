@@ -5,7 +5,7 @@
 //
 //   Constants
 //   Values and links ......... numberOrNaN, isThemeName, safeUrl, provider
-//   Config and saved state ... normalizeConfig, parseConfig, resolveMode, parseThemeOverrides, resolveThemes
+//   Config and saved state ... normalizeConfig, stripJsonc, parseConfig, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
 //   Agenda ................... isAlertable, eventKey, nextDue, claimDue, pruneFired, statusSnapshot
 //   Timing on the card ....... phase, progress, countdown, isOver
 //   Card input ............... isGuarded, initialSelection, nextSelection, activation
@@ -15,16 +15,52 @@
 
 // ---------------------------------------------------------------- Constants
 
+/**
+ * The one declaration of every key ominous.json reads, in the order the printed config shows
+ * them. The defaults, the comments of `config`, the example file and the JSON Schema all come
+ * from here; normalizeConfig stays hand-written and a test checks it accepts each default.
+ *
+ * @type {ConfigField[]}
+ */
+var CONFIG_FIELDS = [
+  { key: "calendars", default: [],
+    description: "Calendars that alert, by name or id (see `omacal calendars`). Empty = all of them.",
+    schema: { type: "array", items: { type: "string" } } },
+  { key: "onlyWithLink", default: false,
+    description: "true = alert only for meetings with an https join link.",
+    schema: { type: "boolean" } },
+  { key: "leadSeconds", default: 60,
+    description: "Seconds before the start when the card appears (0-3600).",
+    schema: { type: "integer", minimum: 0, maximum: 3600 } },
+  { key: "tenseSeconds", default: 15,
+    description: "Seconds before the start when the card turns tense (0-3600); 0 = never.",
+    schema: { type: "integer", minimum: 0, maximum: 3600 } },
+  { key: "dim", default: null,
+    description: "Opacity of the veil behind the card, 0-1; null = the theme's own.",
+    schema: { type: ["number", "null"], minimum: 0, maximum: 1 } },
+  { key: "mode", default: "professional",
+    description: "Mode until you switch on the card (M): professional or playful.",
+    schema: { enum: ["professional", "playful"] } },
+  { key: "themes", default: { professional: "classic", playful: "marine" },
+    description: "Theme of each mode (see `omarchy-shell ominous themes`).",
+    schema: { type: "object",
+              properties: { professional: { type: "string", pattern: "^[a-z0-9_-]{1,40}$" },
+                            playful: { type: "string", pattern: "^[a-z0-9_-]{1,40}$" } },
+              additionalProperties: false } }
+]
+
+/** Where the schema of ominous.json is published, for the `$schema` key of the printed config. */
+var SCHEMA_URL = "https://raw.githubusercontent.com/Tuland/ominous/main/docs/ominous.schema.json"
+
+/** Where the keys are explained at length. */
+var CONFIG_DOCS_URL = "https://github.com/Tuland/ominous/blob/main/docs/configuration.md"
+
 /** @type {Config} */
-var DEFAULTS = {
-  calendars: [],      // calendar names or ids; empty = every calendar
-  leadSeconds: 60,
-  dim: null,          // 0..1 opacity of the veil behind the card; null = theme's menu scrim
-  tenseSeconds: 15,   // the card turns "tense" this long before the start; 0 = never
-  mode: "professional",
-  themes: { professional: "classic", playful: "marine" },
-  onlyWithLink: false // true = alert only for meetings with an https join link
-}
+var DEFAULTS = (function() {
+  var d = /** @type {*} */ ({})
+  CONFIG_FIELDS.forEach(function(f) { d[f.key] = f.default })
+  return d
+})()
 
 /** @type {Mode[]} */
 var MODES = ["professional", "playful"]
@@ -44,6 +80,12 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @typedef {"professional"|"playful"} Mode
  * @typedef {"relaxed"|"tense"|"angry"} Phase
  * @typedef {Object<string, string>} ThemeChoice  Theme name per mode, only for the modes chosen.
+ *
+ * @typedef {Object} ConfigField  One key of ominous.json.
+ * @property {string} key
+ * @property {*} default  The value when the key is missing or invalid.
+ * @property {string} description  One line, shown above the key in the printed config.
+ * @property {Object<string, *>} schema  The JSON Schema fragment for the value.
  *
  * @typedef {Object} Config  ominous.json after normalizeConfig; every field has its default.
  * @property {string[]} calendars  Lowercased calendar names or ids; empty = every calendar.
@@ -187,16 +229,145 @@ function normalizeConfig(raw) {
 }
 
 /**
- * Reads ominous.json's text. A missing file (empty text) is fine; broken JSON gives defaults
- * and an error.
+ * Turns a config file with comments into plain JSON text: drops a leading UTF-8 byte order
+ * mark, `//` comments up to the end of the line, and a comma that is followed only by white
+ * space before a `]` or `}`. Text inside a string, `//` included, is left as it is.
  *
  * @param {string} text The file's content.
- * @returns {{config: Config, error: string}} The error is "" when the file parsed.
+ * @returns {string} The same text without the above; a file that had none comes back unchanged.
+ */
+function stripJsonc(text) {
+  var s = String(text)
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1)
+  var out = ""
+  var i = 0, j = 0
+  // Pass 1: comments. A string runs to its closing quote; a backslash skips the next character.
+  while (i < s.length) {
+    if (s[i] === '"') {
+      j = i + 1
+      while (j < s.length && s[j] !== '"') j += s[j] === "\\" ? 2 : 1
+      out += s.slice(i, j + 1)
+      i = j + 1
+    } else if (s[i] === "/" && s[i + 1] === "/") {
+      while (i < s.length && s[i] !== "\n") i++
+    } else {
+      out += s[i]
+      i++
+    }
+  }
+  // Pass 2: trailing commas, on the text without comments.
+  var res = ""
+  i = 0
+  while (i < out.length) {
+    if (out[i] === '"') {
+      j = i + 1
+      while (j < out.length && out[j] !== '"') j += out[j] === "\\" ? 2 : 1
+      res += out.slice(i, j + 1)
+      i = j + 1
+    } else if (out[i] === ",") {
+      j = i + 1
+      while (j < out.length && /\s/.test(out[j])) j++
+      if (out[j] !== "]" && out[j] !== "}") res += ","
+      i++
+    } else {
+      res += out[i]
+      i++
+    }
+  }
+  return res
+}
+
+/**
+ * Reads ominous.json's text, which may hold comments and trailing commas. A missing file
+ * (empty text) is fine; broken JSON gives defaults and an error. Top-level keys that Ominous
+ * does not use are listed so the user can see a misspelling; `$schema` is for editors and is
+ * not reported.
+ *
+ * @param {string} text The file's content.
+ * @returns {{config: Config, error: string, unknownKeys: string[]}} The error is "" when the
+ *     file parsed; unknownKeys is sorted.
  */
 function parseConfig(text) {
   var raw = null, error = ""
-  try { raw = JSON.parse(text || "{}") } catch (e) { error = "config parse failed, using defaults" }
-  return { config: normalizeConfig(raw), error: error }
+  try { raw = JSON.parse(stripJsonc(text || "{}")) } catch (e) { error = "config parse failed, using defaults" }
+  /** @type {string[]} */
+  var unknownKeys = []
+  if (raw && typeof raw === "object" && !Array.isArray(raw))
+    unknownKeys = Object.keys(raw).filter(function(/** @type {string} */ k) {
+      return k !== "$schema" && !Object.prototype.hasOwnProperty.call(DEFAULTS, k)
+    }).sort()
+  return { config: normalizeConfig(raw), error: error, unknownKeys: unknownKeys }
+}
+
+/**
+ * A value as JSON on one line, with a space after each comma and colon.
+ *
+ * @param {*} v A string, number, boolean, null, list or plain object.
+ * @returns {string}
+ */
+function inlineJson(v) {
+  if (Array.isArray(v)) return "[" + v.map(inlineJson).join(", ") + "]"
+  if (v && typeof v === "object")
+    return "{" + Object.keys(v).map(function(/** @type {string} */ k) { return " " + JSON.stringify(k) + ": " + inlineJson(v[k]) }).join(",") + (Object.keys(v).length ? " " : "") + "}"
+  return JSON.stringify(v)
+}
+
+/**
+ * The complete config as text for ominous.json: every key in the declaration's order, each
+ * under a one-line comment, with the config's value. Reading it back gives the same config.
+ *
+ * @param {Config} config The effective config.
+ * @param {string[]} unknownKeys Keys the user's file has that Ominous does not use.
+ * @returns {string}
+ */
+function formatConfig(config, unknownKeys) {
+  var cfg = /** @type {Object<string, *>} */ (/** @type {*} */ (config))
+  var lines = [
+    "// Ominous settings. Every key is optional: a missing key keeps its default.",
+    "// Each key shows its current value: yours where you set one, the default otherwise. The mode and the",
+    "// themes you choose on the card or with `theme` are kept in ~/.local/state/ominous instead,",
+    "// and win over \"mode\" and \"themes\" below.",
+    "// Every key is explained at " + CONFIG_DOCS_URL
+  ]
+  if (unknownKeys.length > 0)
+    lines.push("// Unknown keys in your file, ignored: " + unknownKeys.join(", "))
+  lines.push("{", "  " + JSON.stringify("$schema") + ": " + JSON.stringify(SCHEMA_URL) + ",")
+  CONFIG_FIELDS.forEach(function(f, i) {
+    lines.push("", "  // " + f.description,
+               "  " + JSON.stringify(f.key) + ": " + inlineJson(cfg[f.key]) + (i < CONFIG_FIELDS.length - 1 ? "," : ""))
+  })
+  lines.push("}", "")
+  return lines.join("\n")
+}
+
+/**
+ * The JSON Schema of ominous.json, for editors: one property per declared key with its type,
+ * range, default and description, and `$schema` allowed. Unknown keys are allowed too: Ominous
+ * only warns about them, and an editor should not call them errors.
+ *
+ * @returns {Object<string, *>}
+ */
+function configSchema() {
+  /** @type {Object<string, *>} */
+  var properties = {
+    "$schema": { type: "string", description: "Where this schema is published; editors use it, Ominous ignores it." }
+  }
+  CONFIG_FIELDS.forEach(function(f) {
+    /** @type {Object<string, *>} */
+    var p = {}
+    for (var k in f.schema) p[k] = f.schema[k]
+    p.default = f.default
+    p.description = f.description
+    properties[f.key] = p
+  })
+  return {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": SCHEMA_URL,
+    title: "Ominous settings (ominous.json)",
+    type: "object",
+    properties: properties,
+    additionalProperties: true
+  }
 }
 
 /**

@@ -32,6 +32,10 @@ Item {
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/ominous"
 
   property var config: Logic.normalizeConfig(null)
+  // What the last read of ominous.json found wrong: keys Ominous does not use, or why the file
+  // could not be read. Shown by `status` and in the log, never on the card.
+  property var unknownKeys: []
+  property string configError: ""
   property string stateText: ""
   readonly property string mode: Logic.resolveMode(root.stateText, root.config)
   // The `theme` command's choice (themes.json, written only here) over ominous.json's.
@@ -51,14 +55,18 @@ Item {
   function log(msg: string): void { console.log("ominous: " + msg) }
 
   /**
-   * Applies ominous.json's text; broken JSON keeps the defaults and logs why.
+   * Applies ominous.json's text; broken JSON keeps the defaults. Logs one line when the file has
+   * unknown keys or cannot be read, and keeps both for `status`.
    *
    * @param text The file's content.
    */
   function loadConfig(text: string): void {
     var r = Logic.parseConfig(text)
     if (r.error) root.log(r.error)
+    if (r.unknownKeys.length > 0) root.log("unknown key" + (r.unknownKeys.length > 1 ? "s" : "") + " in ominous.json (ignored): " + r.unknownKeys.join(", "))
     root.config = r.config
+    root.unknownKeys = r.unknownKeys
+    root.configError = r.error
   }
 
   /**
@@ -290,11 +298,22 @@ Item {
       return r.message
     }
 
-    /** IPC: the config, counts and times, and the last error; never titles. */
+    /**
+     * IPC: the complete effective config as text for ominous.json: your values, the defaults for
+     * the rest, each key under a one-line comment, and the unknown keys of your file named at
+     * the top. Prints only; no file is written.
+     */
+    function config(): string {
+      return Logic.formatConfig(root.config, root.unknownKeys)
+    }
+
+    /** IPC: the config and what is wrong with the file, counts and times, and the last error; never titles. */
     function status(): string {
       var s = Logic.statusSnapshot(root.events, root.config, Date.now())
       return JSON.stringify({
         config: root.config,
+        unknownKeys: root.unknownKeys,
+        configError: root.configError,
         mode: root.mode,
         themes: root.themeNames,
         themeError: root.themeError,

@@ -24,9 +24,16 @@ if ((UNIT)); then
   # A glob, not a folder: Node before 26 reads a folder argument as a file. The spec reporter
   # gives the summary lines parsed below on every Node version, terminal or not.
   node --test --test-reporter=spec 'tests/*.test.mjs' 2>&1 | tee "$out"
+  node_rc=${PIPESTATUS[0]}
   p=$(sed -n 's/^ℹ pass \([0-9]*\).*/\1/p' "$out"); f=$(sed -n 's/^ℹ fail \([0-9]*\).*/\1/p' "$out")
   unit_res="${p:-0}/$(( ${p:-0} + ${f:-1} ))"
-  if [[ ${f:-1} != 0 ]]; then rc=1; problems+="unit: $(grep -E '^\s*✖' "$out" | sed 's/([0-9.]*ms)//; s/^\s*✖ //' | head -5 | paste -sd';') "; fi
+  # node's exit status too: a suite that throws while it is being defined shows as ✖ but is in
+  # neither the pass nor the fail count.
+  if [[ ${f:-1} != 0 || $node_rc != 0 ]]; then
+    rc=1
+    failed=$(grep -E '^\s*✖' "$out" | sed 's/([0-9.]*ms)//; s/^\s*✖ //' | head -5 | paste -sd';')
+    problems+="unit: ${failed:-node exited $node_rc} "
+  fi
 fi
 
 if ((UNIT)); then

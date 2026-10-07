@@ -12,9 +12,9 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 
 - `Service.qml` — polls `omacal agenda --json` every 60 s, checks the alert window every 5 s,
   summons the overlay through the injected `shell.summon(id, payloadJson)`; IPC target
-  `ominous` (`test`, `preview`, `status`, `themes`, `theme`). The mode lives in
+  `ominous` (`test`, `preview`, `status`, `config`, `themes`, `theme`). The mode lives in
   `~/.local/state/ominous/state.json` (written only by the overlay), the `theme` choice in
-  `themes.json` beside it (written only by the service); `ominous.json` is never written.
+  `themes.json` beside it (written only by the service); `ominous.json` is never written (`config` only prints it).
 - `Alert.qml` — the overlay: `open(payloadJson)` / `close()`, a `PanelWindow` on
   `WlrLayer.Overlay`, theme tokens from `qs.Commons` (`Color`, `Style`, `Util`, `Border`).
 - `Logic.js` — every decision, as pure functions with no QML types, so node can run them; an

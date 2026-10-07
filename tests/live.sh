@@ -87,6 +87,24 @@ sum_before=$(md5sum "$CONFIG" 2>/dev/null | cut -d' ' -f1)
 status_shape() { jsonget "d['mode'] in ('professional','playful') and set(d['themes'])=={'professional','playful'} and 'themeError' in d and 'tenseSeconds' in d['config']" | grep -qx True; }
 check "status reports mode, themes, themeError and the config" status_shape
 
+config_report_shape() { jsonget "isinstance(d['unknownKeys'], list) and isinstance(d['configError'], str)" | grep -qx True; }
+check "status reports unknownKeys and configError" config_report_shape
+
+# What `config` prints, read back by Logic.js (comments and all), must be the config `status`
+# shows. node is a development tool of this repository, like the unit tests'.
+config_round_trip() {
+  omarchy-shell ominous config > "$BK/config.out" && omarchy-shell ominous status > "$BK/status.out" || return 1
+  node -e '
+    const fs = require("fs"), vm = require("vm"), L = {}
+    vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8").replace(".pragma library", ""), L)
+    const r = L.parseConfig(fs.readFileSync(process.argv[2], "utf8"))
+    const shown = JSON.parse(fs.readFileSync(process.argv[3], "utf8")).config
+    const same = JSON.stringify(JSON.parse(JSON.stringify(r.config))) === JSON.stringify(shown)
+    process.exit(r.error === "" && r.unknownKeys.length === 0 && same ? 0 : 1)
+  ' "$(dirname "$0")/../Logic.js" "$BK/config.out" "$BK/status.out"
+}
+check "config prints a complete config that reads back to the one status shows" config_round_trip
+
 no_title_in_status() {
   [[ $(omarchy-shell ominous preview "relaxed professional SECRET_TITLE_QQ") == ok ]] && wait_for 15 overlay_open || return 1
   local out; out=$(omarchy-shell ominous status)

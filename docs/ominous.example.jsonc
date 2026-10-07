@@ -1,0 +1,29 @@
+// Ominous settings. Every key is optional: a missing key keeps its default.
+// Each key shows its current value: yours where you set one, the default otherwise. The mode and the
+// themes you choose on the card or with `theme` are kept in ~/.local/state/ominous instead,
+// and win over "mode" and "themes" below.
+// Every key is explained at https://github.com/Tuland/ominous/blob/main/docs/configuration.md
+{
+  "$schema": "https://raw.githubusercontent.com/Tuland/ominous/main/docs/ominous.schema.json",
+
+  // Calendars that alert, by name or id (see `omacal calendars`). Empty = all of them.
+  "calendars": [],
+
+  // true = alert only for meetings with an https join link.
+  "onlyWithLink": false,
+
+  // Seconds before the start when the card appears (0-3600).
+  "leadSeconds": 60,
+
+  // Seconds before the start when the card turns tense (0-3600); 0 = never.
+  "tenseSeconds": 15,
+
+  // Opacity of the veil behind the card, 0-1; null = the theme's own.
+  "dim": null,
+
+  // Mode until you switch on the card (M): professional or playful.
+  "mode": "professional",
+
+  // Theme of each mode (see `omarchy-shell ominous themes`).
+  "themes": { "professional": "classic", "playful": "marine" }
+}

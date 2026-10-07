@@ -6,6 +6,18 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `ominous.json` may hold `//` comments, a comma after the last item and a leading byte order
+  mark, so an option can sit commented out until you want it.
+- Keys in `ominous.json` that Ominous does not use are named in `omarchy-shell ominous status`
+  (`unknownKeys`) and in the shell log, so a misspelt key no longer does nothing in silence.
+  `status` also reports `configError` when the file cannot be read.
+- `omarchy-shell ominous config` prints your complete config: every key with a one-line comment,
+  your values and the defaults for the rest, so a key added by an update shows up. It only
+  prints; Ominous still never writes `ominous.json`.
+- `docs/ominous.example.jsonc` (every key at its default) and `docs/ominous.schema.json`, a JSON
+  Schema that lets editors complete the keys and flag a wrong value.
+
 ### Security
 - The calendar name on the card's top line is shown as plain text. Before, a name that looked
   like markup was rendered as rich text, so the owner of a shared calendar could make the card

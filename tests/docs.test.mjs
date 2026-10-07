@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs"
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 import { L } from "./helpers.mjs"
+import { generated } from "../tools/make-config-docs.mjs"
 
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8")
 const exists = (path) => existsSync(new URL("../" + path, import.meta.url))
@@ -56,6 +57,27 @@ describe("docs", () => {
     const md = read("docs/themes.md")
     for (const f of readdirSync(new URL("../themes/", import.meta.url)).filter((f) => f.endsWith(".json")))
       assert.ok(md.includes("| `" + f.replace(".json", "") + "` |"), "themes.md lists " + f)
+  })
+})
+
+describe("generated config files", () => {
+  // docs/ominous.example.jsonc and docs/ominous.schema.json come from the declaration in
+  // Logic.js (tools/make-config-docs.mjs); this keeps them from falling behind it.
+  for (const [path, text] of Object.entries(generated()))
+    test(path + " matches the code", () => {
+      assert.equal(read(path), text, path + " is out of date: run tools/make-config-docs.mjs")
+    })
+
+  test("the example reads back to the defaults, with no unknown key and no error", () => {
+    const r = L.parseConfig(read("docs/ominous.example.jsonc"))
+    assert.equal(r.error, "")
+    assert.deepEqual([...r.unknownKeys], [])
+    assert.deepEqual(JSON.parse(JSON.stringify(r.config)), JSON.parse(JSON.stringify(L.normalizeConfig(null))))
+  })
+
+  test("the example points to the published schema, which is the schema file's id", () => {
+    const schema = JSON.parse(read("docs/ominous.schema.json"))
+    assert.ok(read("docs/ominous.example.jsonc").includes('"$schema": "' + schema.$id + '"'))
   })
 })
 

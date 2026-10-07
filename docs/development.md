@@ -27,6 +27,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
+| `tools/make-config-docs.mjs` | Writes `docs/ominous.example.jsonc` and `docs/ominous.schema.json` from the config declaration in `Logic.js` (`--check` only compares); a unit test fails when they are stale. |
 | `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts, `tsc` on the JSDoc types of `Logic.js`, `mypy` on the Python. |
 | `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
