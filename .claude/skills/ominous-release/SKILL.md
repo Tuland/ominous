@@ -53,14 +53,32 @@ Proposed: 0.3.0 (one compatible addition). Not 1.0.0: not public yet.
 
 Wait for the user's choice before changing any file.
 
-## 2.5. Audit
+## 2.5. Review and audit
 
-Run the audit that `docs/development.md` describes under "Security", over the whole code and not
-the diff since the tag: follow each untrusted source in the map to each of its uses, check the
-tests that hold each rule, and update the map where the code changed. Report the result to the
-user in a short table (source, use, verdict). A finding that is not fixed stops the release:
-open an OpenSpec change for it and start again afterwards. Never skip this step because the
-changes since the tag "do not touch" input handling: the point is the old code in a new context.
+Two checks of the whole release, both in a context separate from the one that wrote the code
+(`/code-review` and `/security-review` in Claude Code, a reviewer agent elsewhere): an author
+reads what they meant, a separate reviewer reads what is there. The per-change reviews saw one
+diff each; this one sees the release.
+
+1. **Code review** of `git diff <last tag>..HEAD`, against the archived changes of the release
+   and their specs: logic, edge cases, wrong comments, docs and lists that fell behind. Give the
+   range explicitly: `/code-review` without a target reviews only the current changes, which
+   right after an archive are none.
+2. **Security audit**, as `docs/development.md` describes under "Security", over the whole code
+   and not the diff, by a separate reviewer agent given the map and the threat model:
+   `/security-review` covers only the pending changes, so it is not this audit. Follow the data
+   into the commands the plugin starts, too (`omarchy-launch-browser` runs the browser through
+   `systemd-run`, which expands `${VAR}`): follow each untrusted source in the map to each of its uses, check the tests
+   that hold each rule, and update the map where the code changed. Never skip it because the
+   changes since the tag "do not touch" input handling: the point is old code in a new context.
+
+Report both to the user: the findings by severity, then a short table (source, use, verdict) for
+the audit. A finding that is not fixed stops the release: open an OpenSpec change for it and
+start again afterwards.
+
+The marketplace's own scanner (`scripts/security-baseline.mjs`) cannot run here: it reads the
+repository through the GitHub API at a pushed commit and has no local-folder mode. It runs in
+step 5, right after the push, so keep this audit at least as strict as what it checks.
 
 ## 3. Cut it
 
@@ -91,11 +109,13 @@ The facts come from the marketplace's own `SUBMISSION.md` (clone `omacom/omarchy
 into the scratchpad); read it again, since the process may change.
 
 - **Submission still in review** (labels such as `needs-fixes`): the maintainer's approval is
-  bound to the exact commit its bots validated, so a new commit needs a new validation. Run
-  `scripts/validate-submission.mjs --repo=<repo URL>` and `scripts/security-baseline.mjs` from
-  that clone on the new HEAD first. Show the user a reply for the issue: what changed, the
-  commit and the test for each point the maintainer raised, and a pointer to the changelog. Post
-  it on their word, then ask them to edit the issue (any edit) so the bots validate again.
+  bound to the exact commit its bots validated, so a new commit needs a new validation. After
+  the push, run `scripts/validate-submission.mjs --repo=<repo URL>` and
+  `scripts/security-baseline.mjs` from that clone on the new HEAD (both read the pushed commit).
+  A finding means a new change and a new commit. Show the user a reply for the issue: what
+  changed, the commit and the test for each point the maintainer raised, and a pointer to the
+  changelog. Post it on their word, then ask them to edit the issue (any edit) so the bots
+  validate again.
 - **Plugin listed**: the user opens the marketplace's "Plugin verification" form, chooses
   "Verify and publish a newer upstream commit" and gives the release commit's SHA. Until it is
   approved, the site shows the new version as unverified. Prepare the SHA and a one-paragraph

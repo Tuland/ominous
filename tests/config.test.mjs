@@ -198,7 +198,7 @@ describe("the printed config", () => {
     assert.ok(on.includes(`// "${optional[1]}"`))
   })
 
-  test("removing // in front of an optional host trusts it as well", () => {
+  test("removing // in front of an optional host recognizes it as well", () => {
     const out = L.formatConfig(L.normalizeConfig(null), [])
     const host = [...L.CONFIG_FIELDS].find((f) => f.key === "joinHosts").optional[0]
     assert.ok(!L.parseConfig(out).config.joinHosts.includes(host))
@@ -209,7 +209,7 @@ describe("the printed config", () => {
   test("names unknown keys in the header, only when there are some", () => {
     assert.doesNotMatch(L.formatConfig(L.normalizeConfig(null), []), /nknown/)
     const out = L.formatConfig(L.normalizeConfig(null), ["joinhost", "leadsecond"])
-    assert.match(out.split("\n{")[0], /^\/\/ .*nknown keys.*: joinhost, leadsecond$/m)
+    assert.match(out.split("\n{")[0], /^\/\/ .*nknown keys.*: "joinhost", "leadsecond"$/m)
   })
 
   test("says that the card's saved mode and theme are kept apart", () => {
@@ -293,5 +293,124 @@ describe("saved mode", () => {
     assert.equal(L.resolveMode('{"mode":"loud"}', playful), "playful")
     assert.equal(L.resolveMode("null", dflt), "professional")
     assert.equal(L.resolveMode(undefined, dflt), "professional")
+  })
+})
+
+describe("a config file of only comments", () => {
+  test("reads like an empty file: defaults, no error", () => {
+    for (const text of ["// nothing yet\n", "\n\n", "   \t\n", "// a\n// b\n\n", "\uFEFF// only a mark and a comment\n"]) {
+      const r = L.parseConfig(text)
+      assert.equal(r.error, "", JSON.stringify(text))
+      assert.equal(r.config.leadSeconds, 60)
+      assert.deepEqual([...r.unknownKeys], [])
+      assert.deepEqual([...r.ignored], [])
+    }
+    assert.equal(L.parseConfig("// still {broken").error, "")
+    assert.equal(L.parseConfig("{ nope").error, "config parse failed, using defaults")
+  })
+})
+
+describe("quoted values in comments and logs", () => {
+  test("one printable-ASCII line, escaped, cut at 40", () => {
+    assert.equal(L.quoted("a"), '"a"')
+    assert.equal(L.quoted(9999), "9999")
+    assert.equal(L.quoted(null), "null")
+    assert.equal(L.quoted(undefined), "undefined")
+    for (const v of ["a\nb", "a\rb", "a\u2028b", "a\u202eb", "a\u0000b", "\u00e9"])
+      assert.match(L.quoted(v), /^[\x20-\x7e]*$/, JSON.stringify(v))
+    assert.equal(L.quoted("a\nb"), '"a\\nb"')
+    assert.equal(L.quoted("a\u2028b"), '"a\\u2028b"')
+    const cut = L.quoted("a\u00e9".repeat(30))
+    assert.ok(cut.endsWith("\u2026") && !/\\u?[0-9a-f]{0,3}\u2026$/.test(cut) && cut.length <= 40, cut)
+    assert.equal(L.quoted("x".repeat(100)).length, 40)
+    const slash = L.quoted("a".repeat(36) + "\\\\x")
+    assert.ok(!/(^|[^\\])(\\\\)*\\\u2026$/.test(slash), slash)
+    assert.ok(L.quoted("x".repeat(100)).endsWith("\u2026"))
+  })
+
+  test("an unknown key with a line break stays on its comment line, and the output reads back", () => {
+    const r = L.parseConfig('{ "a\\nb": 1, "x\\u202ey": 2, "leadSeconds": 90 }')
+    assert.deepEqual([...r.unknownKeys], ["a\nb", "x\u202ey"])
+    const out = L.formatConfig(r.config, r.unknownKeys, r.ignored)
+    const header = out.split("\n{")[0]
+    assert.ok(header.split("\n").every((l) => l.startsWith("//")), "every header line is a comment")
+    assert.match(header, /"a\\nb", "x\\u202ey"/)
+    const back = L.parseConfig(out)
+    assert.equal(back.error, "")
+    assert.equal(back.config.leadSeconds, 90)
+  })
+})
+
+describe("values the config ignores", () => {
+  const ignoredOf = (raw) => [...L.parseConfig(JSON.stringify(raw)).ignored]
+
+  test("one entry per refused value, naming the key and the value", () => {
+    assert.deepEqual(ignoredOf({ leadSeconds: 9999 }), ["leadSeconds: 9999"])
+    assert.deepEqual(ignoredOf({ tenseSeconds: "soon" }), ['tenseSeconds: "soon"'])
+    assert.deepEqual(ignoredOf({ dim: 2 }), ["dim: 2"])
+    assert.deepEqual(ignoredOf({ mode: "loud" }), ['mode: "loud"'])
+    assert.deepEqual(ignoredOf({ onlyWithLink: "true" }), ['onlyWithLink: "true"'])
+    assert.deepEqual(ignoredOf({ calendars: "work" }), ['calendars: "work"'])
+    assert.deepEqual(ignoredOf({ themes: "shiba" }), ['themes: "shiba"'])
+    assert.deepEqual(ignoredOf({ themes: { playful: "../x", professional: "classic" } }), ['themes.playful: "../x"'])
+    assert.deepEqual(ignoredOf({ joinHosts: "zoom.us" }), ['joinHosts: "zoom.us"'])
+    assert.deepEqual(ignoredOf({ themes: { Playful: "boss", profesional: "classic" } }), ['themes.Playful: "boss"', 'themes.profesional: "classic"'])
+  })
+
+  test("a bad list entry is named, the good ones stay", () => {
+    const r = L.parseConfig('{ "joinHosts": ["https://zoom.us/", "Zoom.US", "meet.acme.example:8443", 5] }')
+    assert.deepEqual([...r.config.joinHosts], ["zoom.us"])
+    assert.deepEqual([...r.ignored], ['joinHosts: "https://zoom.us/"', 'joinHosts: "meet.acme.example:8443"', "joinHosts: 5"])
+    assert.deepEqual(ignoredOf({ calendars: ["Work", "", 3] }), ['calendars: ""'])
+  })
+
+  test("a calendar entry that is not a string or a number is ignored and cannot throw", () => {
+    const r = L.parseConfig('{ "calendars": [{ "toString": null }, ["x"], null, true, 7, "Work"] }')
+    assert.deepEqual([...r.config.calendars], ["7", "work"])
+    assert.equal(r.ignored.length, 4)
+  })
+
+  test("null, a boolean and an empty string no longer read as 0", () => {
+    for (const bad of [null, "", true]) {
+      assert.equal(L.normalizeConfig({ leadSeconds: bad }).leadSeconds, 60, JSON.stringify(bad))
+      assert.equal(ignoredOf({ leadSeconds: bad }).length, 1, JSON.stringify(bad))
+    }
+    assert.equal(L.normalizeConfig({ dim: true }).dim, null)
+    assert.deepEqual(ignoredOf({ dim: null }), [])
+  })
+
+  test("values that are normalized, not refused, are not reported", () => {
+    assert.deepEqual(ignoredOf({ leadSeconds: 90.4, calendars: ["Work@Example.com"], dim: "0.5", joinHosts: ["Zoom.US", "zoom.us"],
+                                tenseSeconds: "20", onlyWithLink: false, mode: "playful", themes: { playful: "shiba" } }), [])
+    assert.equal(L.normalizeConfig({ leadSeconds: 90.4 }).leadSeconds, 90)
+  })
+
+  test("a file that is no object is reported, and so is a list for themes", () => {
+    for (const [text, entry] of [["[]", "file: []"], ["5", "file: 5"], ['"x"', 'file: "x"'], ['{"a":1}'.replace('{"a":1}', "{ \"themes\": [] }"), "themes: []"]]) {
+      const r = L.parseConfig(text)
+      assert.deepEqual([...r.ignored], [entry], text)
+      assert.equal(r.config.leadSeconds, 60)
+      assert.equal(r.error, "")
+    }
+    assert.deepEqual([...L.parseConfig("null").ignored], ["file: null"])
+    assert.deepEqual([...L.parseConfig("{ nope").ignored], [])
+  })
+
+  test("a clean file, an empty file and broken JSON report none", () => {
+    assert.deepEqual(ignoredOf({}), [])
+    assert.deepEqual([...L.parseConfig("").ignored], [])
+    assert.deepEqual([...L.parseConfig("{ nope").ignored], [])
+    assert.deepEqual([...L.parseConfig(L.formatConfig(L.normalizeConfig(null), [], [])).ignored], [])
+  })
+
+  test("the printed config names them at the top and still reads back", () => {
+    const r = L.parseConfig('{ "leadSeconds": 9999, "joinHosts": ["https://zoom.us/", "meet.acme.example"] }')
+    const out = L.formatConfig(r.config, r.unknownKeys, r.ignored)
+    const header = out.split("\n{")[0]
+    assert.match(header, /^\/\/ .*ignored.*leadSeconds: 9999; joinHosts: "https:\/\/zoom\.us\/"$/m)
+    assert.match(out, /"leadSeconds": 60,/)
+    const back = L.parseConfig(out)
+    assert.deepEqual([...back.ignored], [])
+    assert.deepEqual(JSON.parse(JSON.stringify(back.config)), JSON.parse(JSON.stringify(r.config)))
   })
 })

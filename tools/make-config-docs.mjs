@@ -16,7 +16,7 @@ vm.runInNewContext(readFileSync(new URL("Logic.js", root), "utf8").replace(".pra
 
 /** The files this script owns, by path from the repository root, with their expected text. */
 export const generated = () => ({
-  "docs/ominous.example.jsonc": L.formatConfig(L.normalizeConfig(null), []),
+  "docs/ominous.example.jsonc": L.formatConfig(L.normalizeConfig(null), [], []),
   "docs/ominous.schema.json": JSON.stringify(L.configSchema(), null, 2) + "\n",
 })
 

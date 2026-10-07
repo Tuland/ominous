@@ -4,8 +4,8 @@
 // in tests/ run them under node, and Service.qml and Alert.qml stay glue.
 //
 //   Constants
-//   Values and links ......... numberOrNaN, isThemeName, safeUrl, linkHost, shortHost, hostList, joinTarget, unknownLinkTip
-//   Config and saved state ... normalizeConfig, stripJsonc, parseConfig, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
+//   Values and links ......... numberOrNaN, quoted, cleanText, isThemeName, safeUrl, hostOf, linkHost, displayHost, shortHost, checkHostList, hostList, hostIn, joinTarget, unknownLinkTip
+//   Config and saved state ... checkConfig, normalizeConfig, stripJsonc, parseConfig, inlineJson, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
 //   Agenda ................... isAlertable, eventKey, nextDue, claimDue, pruneFired, statusSnapshot
 //   Timing on the card ....... phase, progress, countdown, isOver
 //   Card input ............... isGuarded, initialSelection, nextSelection, activation
@@ -15,31 +15,29 @@
 
 // ---------------------------------------------------------------- Constants
 
-/** The meeting hosts trusted when ominous.json has no joinHosts. */
-var DEFAULT_JOIN_HOSTS = [
-  "meet.google.com", "zoom.us", "zoom.com", "zoomgov.com", "teams.microsoft.com", "teams.live.com",
-  "teams.microsoft.us", "teams.cloud.microsoft", "webex.com", "meet.jit.si", "whereby.com",
-  "gotomeeting.com", "meet.goto.com", "ringcentral.com", "8x8.vc", "meet.proton.me", "facetime.apple.com"
-]
-
-/** Other meeting hosts, shown commented out in the printed config for the user to enable. */
-var OPTIONAL_JOIN_HOSTS = [
-  "vc.larksuite.com", "vc.feishu.cn", "voovmeeting.com", "cliq.zoho.eu", "meeting.zoho.com",
-  "call.lifesizecloud.com", "app.livestorm.com", "event.demio.com", "streamyard.com", "riverside.fm",
-  "tuple.app", "meet.pumble.com", "join.gong.io", "go.chorus.ai", "doxy.me"
-]
-
 /**
- * The service name the Join button shows for a trusted host under one of these (host suffix,
- * name); a trusted host under none is shown as itself.
+ * The meeting services recognized by default, as (host, name): the narrowest host that covers
+ * the service's meeting links. The host list below comes from the first column and the Join
+ * button shows the name of a recognized host under one of them.
  */
-var SERVICE_NAMES = [
+var JOIN_SERVICES = [
   ["meet.google.com", "Meet"], ["zoom.us", "Zoom"], ["zoom.com", "Zoom"], ["zoomgov.com", "Zoom"],
   ["teams.microsoft.com", "Teams"], ["teams.live.com", "Teams"], ["teams.microsoft.us", "Teams"],
   ["teams.cloud.microsoft", "Teams"], ["webex.com", "Webex"], ["meet.jit.si", "Jitsi"],
   ["whereby.com", "Whereby"], ["gotomeeting.com", "GoTo"], ["meet.goto.com", "GoTo"],
-  ["ringcentral.com", "RingCentral"], ["8x8.vc", "8x8"], ["meet.proton.me", "Proton Meet"],
+  ["v.ringcentral.com", "RingCentral"], ["8x8.vc", "8x8"], ["meet.proton.me", "Proton Meet"],
   ["facetime.apple.com", "FaceTime"]
+]
+
+/** The hosts recognized when ominous.json has no joinHosts. */
+var DEFAULT_JOIN_HOSTS = JOIN_SERVICES.map(function(e) { return e[0] })
+
+/** Other meeting hosts, shown commented out in the printed config for the user to enable. */
+var OPTIONAL_JOIN_HOSTS = [
+  "meetings.ringcentral.com", "vc.larksuite.com", "vc.feishu.cn", "voovmeeting.com", "cliq.zoho.eu",
+  "meeting.zoho.com",
+  "call.lifesizecloud.com", "app.livestorm.com", "event.demio.com", "streamyard.com", "riverside.fm",
+  "tuple.app", "meet.pumble.com", "join.gong.io", "go.chorus.ai", "doxy.me"
 ]
 
 /**
@@ -57,7 +55,7 @@ var CONFIG_FIELDS = [
     description: "true = alert only for meetings with an https join link.",
     schema: { type: "boolean" } },
   { key: "joinHosts", default: DEFAULT_JOIN_HOSTS, optional: OPTIONAL_JOIN_HOSTS,
-    description: "Meeting hosts you trust (subdomains too); your list replaces this one. Other links open with Dismiss selected.",
+    description: "Meeting hosts where Join is selected first (subdomains too); your list replaces this one. Recognized means the service, not the meeting.",
     schema: { type: "array", items: { type: "string", pattern: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+\\.?$" } } },
   { key: "leadSeconds", default: 60,
     description: "Seconds before the start when the card appears (0-3600).",
@@ -126,7 +124,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {string} mode  "professional" or "playful".
  * @property {{professional: string, playful: string}} themes  Theme name per mode.
  * @property {boolean} onlyWithLink  Alert only for meetings with an https join link.
- * @property {string[]} joinHosts  Lowercase hosts whose links are trusted, subdomains included.
+ * @property {string[]} joinHosts  Lowercase hosts whose links are recognized, subdomains included.
  *
  * @typedef {Object} AgendaEvent  One event of `omacal agenda --json` (untrusted input).
  * @property {string} eventId
@@ -170,7 +168,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {number} tenseSeconds
  * @property {string} mode
  * @property {{professional: Theme, playful: Theme}} themes
- * @property {string[]} joinHosts  The trusted join hosts.
+ * @property {string[]} joinHosts  The recognized join hosts.
  */
 
 // ---------------------------------------------------------------- Values and links
@@ -187,6 +185,26 @@ function numberOrNaN(v) {
 }
 
 /**
+ * A value as one short line of text for a log line or a comment: JSON text with every character
+ * outside printable ASCII escaped (JSON.stringify leaves line separators and bidi controls
+ * raw), cut at 40 characters with "…". It cannot end a `//` comment or forge a log line.
+ *
+ * @param {*} value A key name or any parsed JSON value.
+ * @returns {string}
+ */
+function quoted(value) {
+  var text = JSON.stringify(value)
+  if (text === undefined) text = String(value)
+  text = text.replace(/[^\x20-\x7e]/g, function(c) { return "\\u" + ("0000" + c.charCodeAt(0).toString(16)).slice(-4) })
+  // Cut at 39 characters, but not in the middle of a \uXXXX escape.
+  if (text.length <= 40) return text
+  var cut = text.slice(0, 39).replace(/\\u[0-9a-f]{0,3}$/, "")
+  // An odd run of backslashes at the end is half of a "\\" escape.
+  var slashes = (/\\*$/.exec(cut) || [""])[0].length
+  return (slashes % 2 ? cut.slice(0, -1) : cut) + "\u2026"
+}
+
+/**
  * Whether a string is a valid theme name. Theme names end up in a file path, so only a plain
  * slug is accepted.
  *
@@ -198,15 +216,57 @@ function isThemeName(name) {
 }
 
 /**
+ * Calendar text for the card: line breaks, other control characters, line and paragraph
+ * separators, text-direction marks and overrides and zero-width spaces become a space (the
+ * zero-width joiners stay: emoji sequences need them), runs of white space collapse, and the
+ * result is cut at `max` characters. A calendar's owner cannot stretch the card with line
+ * breaks or reorder what is shown.
+ *
+ * @param {*} value The title, place or calendar name.
+ * @param {number} max The most characters to keep.
+ * @returns {string} One line, possibly empty.
+ */
+function cleanText(value, max) {
+  var text = String(value || "").replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u2028-\u202e\u2060\u2066-\u2069\ufeff]/g, " ")
+                                .replace(/\s+/g, " ").trim().slice(0, max)
+  // Do not leave half of a surrogate pair at the cut.
+  return /[\ud800-\udbff]$/.test(text) ? text.slice(0, -1) : text
+}
+
+/**
  * The link the card may open. Calendar data is third-party input: only a plain https URL is
  * ever opened.
  *
  * @param {*} url The link from the calendar or a payload.
- * @returns {string} The URL, or "" when it is not a plain https URL.
+ * @returns {string} The URL, or "" when it is not a plain https URL of at most 2048 characters
+ *     with a host, or when it holds white space, a backslash, a control character or `$`: the
+ *     browser is started through systemd, which expands `${VAR}` in its arguments, so a `$`
+ *     could change the host the browser opens. A host with a `%` escape is refused too, since
+ *     the browser would decode it into another host than the one shown.
  */
 function safeUrl(url) {
   var s = String(url || "")
-  return /^https:\/\/[^\s\\]+$/i.test(s) ? s : ""
+  if (s.length > 2048 || !/^https:\/\/[^\s\\\x00-\x1f\x7f-\x9f$]+$/i.test(s)) return ""
+  var host = hostOf(s)
+  return host !== "" && host.indexOf("%") < 0 ? s : ""
+}
+
+/**
+ * The host part of an https link, without checking the rest: after `https://`, before the first
+ * `/`, `?` or `#`, without user information up to the last `@`, without a port or trailing dots,
+ * in lower case.
+ *
+ * @param {string} s A string that starts with `https://`.
+ * @returns {string} The host, or "" when the link has none (`https:///x`, `https://user@/x`).
+ */
+function hostOf(s) {
+  var m = /^https:\/\/([^\/?#]*)/i.exec(s)
+  if (!m) return ""
+  var authority = m[1]
+  var host = authority.slice(authority.lastIndexOf("@") + 1).replace(/:\d*$/, "")
+  // A loop, not /\.+$/: that regex backtracks quadratically on a long run of dots.
+  while (host.charAt(host.length - 1) === ".") host = host.slice(0, -1)
+  return host.toLowerCase()
 }
 
 /**
@@ -218,46 +278,75 @@ function safeUrl(url) {
  * @returns {string} The host, or "" when there is no safe link.
  */
 function linkHost(url) {
-  var m = /^https:\/\/([^\/?#]*)/i.exec(safeUrl(url))
-  if (!m) return ""
-  var authority = m[1]
-  return authority.slice(authority.lastIndexOf("@") + 1).replace(/:\d*$/, "").replace(/\.+$/, "").toLowerCase()
+  return hostOf(safeUrl(url))
 }
 
 /**
- * A host short enough for the Join button: a long one loses its start, since its end is what
- * says whose it is.
+ * A host as shown to the user: every character outside printable ASCII (right-to-left
+ * overrides, invisible characters, letters of other alphabets) is written as its `\uXXXX`
+ * escape, so that none can hide, reorder or imitate the others.
  *
  * @param {string} host A host from linkHost.
- * @returns {string} The host, or "…" and its last 32 characters.
+ * @returns {string} The host, with the escapes; the same text when it is plain ASCII.
  */
-function shortHost(host) {
-  return host.length > 32 ? "\u2026" + host.slice(-32) : host
+function displayHost(host) {
+  return host.replace(/[^\x21-\x7e]/g, function(c) { return "\\u" + ("0000" + c.charCodeAt(0).toString(16)).slice(-4) })
 }
 
 /**
- * Cleans a list of trusted hosts: entries trimmed, lower-cased, without a trailing dot, kept
+ * A text short enough for the Join button or the tooltip: a long one loses its start, since the
+ * end of a host is what says whose it is.
+ *
+ * @param {string} text A host, usually from displayHost.
+ * @param {number} max The most characters to keep.
+ * @returns {string} The text, or "…" and at most its last `max` characters, never half of an escape.
+ */
+function shortHost(text, max) {
+  if (text.length <= max) return text
+  // Whole characters only: an escape cut in half would read as plain text.
+  var parts = text.match(/\\u[0-9a-f]{4}|[\s\S]/g) || []
+  var kept = ""
+  for (var i = parts.length - 1; i >= 0 && kept.length + parts[i].length <= max; i--) kept = parts[i] + kept
+  return "\u2026" + kept
+}
+
+/**
+ * Cleans a list of hosts to recognize: entries trimmed, lower-cased, without a trailing dot, kept
  * only when they are plain host names with at least one dot, no duplicates.
  *
  * @param {*} raw The list from ominous.json or a payload.
- * @returns {string[]} The valid hosts in their order; an empty list when raw is not a list.
+ * @returns {{hosts: string[], rejected: *[]}} The valid hosts in their order, and the entries
+ *     that are not host names; both empty when raw is not a list.
  */
-function hostList(raw) {
+function checkHostList(raw) {
   /** @type {string[]} */
-  var out = []
-  if (!Array.isArray(raw)) return out
+  var hosts = []
+  /** @type {*[]} */
+  var rejected = []
+  if (!Array.isArray(raw)) return { hosts: hosts, rejected: rejected }
   raw.forEach(function(/** @type {*} */ h) {
-    var host = String(h).trim().toLowerCase().replace(/\.$/, "")
-    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && out.indexOf(host) < 0) out.push(host)
+    var host = typeof h === "string" ? h.trim().toLowerCase().replace(/\.$/, "") : ""
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) rejected.push(h)
+    else if (hosts.indexOf(host) < 0) hosts.push(host)
   })
-  return out
+  return { hosts: hosts, rejected: rejected }
 }
 
 /**
- * Whether a host is a trusted host or a subdomain of one, at any depth.
+ * The valid hosts of a list from ominous.json or a payload (see checkHostList).
+ *
+ * @param {*} raw The list.
+ * @returns {string[]} The hosts in their order; an empty list when raw is not a list.
+ */
+function hostList(raw) {
+  return checkHostList(raw).hosts
+}
+
+/**
+ * Whether a host is a listed host or a subdomain of one, at any depth.
  *
  * @param {string} host A host from linkHost.
- * @param {string[]} hosts The trusted hosts.
+ * @param {string[]} hosts The recognized hosts.
  * @returns {boolean}
  */
 function hostIn(host, hosts) {
@@ -268,44 +357,52 @@ function hostIn(host, hosts) {
  * What the Join button needs to know about a link.
  *
  * @param {*} url The join link.
- * @param {string[]} hosts The trusted hosts.
- * @returns {{host: string, trusted: boolean, label: string}} The host that opens; whether it is
- *     trusted; the button's name for it: the service name for a trusted host of a known service,
- *     else the (shortened) host. All empty when there is no safe link.
+ * @param {string[]} hosts The recognized hosts.
+ * @returns {{host: string, recognized: boolean, label: string}} The host that opens; whether it
+ *     is recognized; the button's name for it: the service name for a recognized host of a known
+ *     service, else the host as displayHost shows it, shortened to 32 characters. All empty when
+ *     there is no safe link.
  */
 function joinTarget(url, hosts) {
   var host = linkHost(url)
-  if (host === "") return { host: "", trusted: false, label: "" }
-  var trusted = hostIn(host, hosts)
-  var label = shortHost(host)
-  if (trusted)
-    for (var i = 0; i < SERVICE_NAMES.length; i++)
-      if (hostIn(host, [SERVICE_NAMES[i][0]])) { label = SERVICE_NAMES[i][1]; break }
-  return { host: host, trusted: trusted, label: label }
+  if (host === "") return { host: "", recognized: false, label: "" }
+  // A host with anything but letters, digits, hyphens and dots (a leftover port, a % escape,
+  // an invisible character) is never recognized, whatever it ends with.
+  var recognized = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && hostIn(host, hosts)
+  var label = shortHost(displayHost(host), 32)
+  if (recognized)
+    for (var i = 0; i < JOIN_SERVICES.length; i++)
+      if (hostIn(host, [JOIN_SERVICES[i][0]])) { label = JOIN_SERVICES[i][1]; break }
+  return { host: host, recognized: recognized, label: label }
 }
 
 /**
- * The tooltip of the "?" beside the Join button of an unrecognized link.
+ * The tooltip of the "?" beside the Join button of an unrecognized link, in lines of at most 65
+ * characters: the shell's tooltip does not wrap, so a longer line would stick out of the card.
  *
- * @param {string} host The link's host.
- * @returns {string} Plain text, a few lines.
+ * @param {string} host The link's host, as joinTarget gives it.
+ * @returns {string} Plain text, five or seven lines; the host is escaped and cut at 64 characters.
  */
 function unknownLinkTip(host) {
-  var tip = "Link not recognized: " + host + ".\nAdd it to joinHosts in ~/.config/omarchy/ominous.json to trust it."
-  if (/[^\x00-\x7f]/.test(host)) tip += "\nIt has non-Latin characters and may imitate another address."
-  return tip
+  var shown = displayHost(host)
+  var lines = ["Link not recognized:", shortHost(shown, 64), "Add it to joinHosts in", "~/.config/omarchy/ominous.json",
+               "to make Join the default for it."]
+  if (shown !== host) lines.push("It has non-Latin characters", "and may imitate another address.")
+  return lines.join("\n")
 }
 
 // ---------------------------------------------------------------- Config and saved state
 
 /**
  * Cleans a parsed ominous.json: every known key with a valid value is kept, everything else
- * gets its default.
+ * gets its default, and each value that was refused is listed so the user can be told.
+ * Normalizing a valid value (rounding, lower case, trimming) is not refusing it.
  *
  * @param {*} raw The parsed file, or anything else.
- * @returns {Config}
+ * @returns {{config: Config, ignored: string[]}} Each ignored entry reads `<key>: <value>`, the
+ *     value quoted; a nested key is written `themes.playful`.
  */
-function normalizeConfig(raw) {
+function checkConfig(raw) {
   /** @type {Config} */
   var cfg = {
     calendars: DEFAULTS.calendars.slice(), leadSeconds: DEFAULTS.leadSeconds, dim: DEFAULTS.dim,
@@ -313,22 +410,68 @@ function normalizeConfig(raw) {
     themes: { professional: DEFAULTS.themes.professional, playful: DEFAULTS.themes.playful },
     onlyWithLink: DEFAULTS.onlyWithLink, joinHosts: DEFAULTS.joinHosts.slice()
   }
-  if (!raw || typeof raw !== "object") return cfg
-  if (Array.isArray(raw.calendars))
-    cfg.calendars = raw.calendars.map(function(/** @type {*} */ c) { return String(c).trim().toLowerCase() })
-                                 .filter(function(/** @type {string} */ c) { return c !== "" })
-  var lead = Number(raw.leadSeconds)
+  /** @type {string[]} */
+  var ignored = []
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    // undefined is what a file that could not be parsed leaves; anything else parsed but is no
+    // object.
+    if (raw !== undefined) ignored.push("file: " + quoted(raw))
+    return { config: cfg, ignored: ignored }
+  }
+  /** @param {string} key @param {*} value */
+  var ignore = function(key, value) { ignored.push(key + ": " + quoted(value)) }
+  var has = function(/** @type {string} */ k) { return raw[k] !== undefined }
+
+  if (has("calendars")) {
+    if (Array.isArray(raw.calendars)) {
+      cfg.calendars = []
+      raw.calendars.forEach(function(/** @type {*} */ c) {
+        var name = typeof c === "string" || typeof c === "number" ? String(c).trim().toLowerCase() : ""
+        if (name === "") ignore("calendars", c)
+        else cfg.calendars.push(name)
+      })
+    } else ignore("calendars", raw.calendars)
+  }
+  var lead = numberOrNaN(raw.leadSeconds)
   if (isFinite(lead) && lead >= 0 && lead <= 3600) cfg.leadSeconds = Math.round(lead)
-  var dim = raw.dim === null || raw.dim === undefined ? NaN : Number(raw.dim)
+  else if (has("leadSeconds")) ignore("leadSeconds", raw.leadSeconds)
+  var dim = numberOrNaN(raw.dim)
   if (isFinite(dim) && dim >= 0 && dim <= 1) cfg.dim = dim
+  else if (has("dim") && raw.dim !== null) ignore("dim", raw.dim)
   var tense = numberOrNaN(raw.tenseSeconds)
   if (isFinite(tense) && tense >= 0 && tense <= 3600) cfg.tenseSeconds = Math.round(tense)
+  else if (has("tenseSeconds")) ignore("tenseSeconds", raw.tenseSeconds)
   if (MODES.indexOf(raw.mode) >= 0) cfg.mode = raw.mode
-  if (raw.themes && typeof raw.themes === "object")
-    MODES.forEach(function(m) { if (isThemeName(raw.themes[m])) cfg.themes[m] = raw.themes[m] })
-  if (raw.onlyWithLink === true) cfg.onlyWithLink = true
-  if (Array.isArray(raw.joinHosts)) cfg.joinHosts = hostList(raw.joinHosts)
-  return cfg
+  else if (has("mode")) ignore("mode", raw.mode)
+  if (has("themes")) {
+    if (raw.themes && typeof raw.themes === "object" && !Array.isArray(raw.themes))
+      Object.keys(raw.themes).forEach(function(/** @type {string} */ m) {
+        if (MODES.indexOf(/** @type {Mode} */ (m)) < 0) ignore("themes." + m, raw.themes[m])
+        else if (isThemeName(raw.themes[m])) cfg.themes[/** @type {Mode} */ (m)] = raw.themes[m]
+        else ignore("themes." + m, raw.themes[m])
+      })
+    else ignore("themes", raw.themes)
+  }
+  if (typeof raw.onlyWithLink === "boolean") cfg.onlyWithLink = raw.onlyWithLink
+  else if (has("onlyWithLink")) ignore("onlyWithLink", raw.onlyWithLink)
+  if (has("joinHosts")) {
+    if (Array.isArray(raw.joinHosts)) {
+      var checked = checkHostList(raw.joinHosts)
+      cfg.joinHosts = checked.hosts
+      checked.rejected.forEach(function(r) { ignore("joinHosts", r) })
+    } else ignore("joinHosts", raw.joinHosts)
+  }
+  return { config: cfg, ignored: ignored }
+}
+
+/**
+ * Cleans a parsed ominous.json (see checkConfig), without the list of refused values.
+ *
+ * @param {*} raw The parsed file, or anything else.
+ * @returns {Config}
+ */
+function normalizeConfig(raw) {
+  return checkConfig(raw).config
 }
 
 /**
@@ -387,19 +530,26 @@ function stripJsonc(text) {
  * not reported.
  *
  * @param {string} text The file's content.
- * @returns {{config: Config, error: string, unknownKeys: string[]}} The error is "" when the
- *     file parsed; unknownKeys is sorted.
+ * @returns {{config: Config, error: string, unknownKeys: string[], ignored: string[]}} The
+ *     error is "" when the file parsed; unknownKeys is sorted; ignored lists the values that were
+ *     refused (see checkConfig).
  */
 function parseConfig(text) {
-  var raw = null, error = ""
-  try { raw = JSON.parse(stripJsonc(text || "{}")) } catch (e) { error = "config parse failed, using defaults" }
+  // undefined when the text does not parse; a file that holds `null` is reported by checkConfig.
+  /** @type {*} */
+  var raw = undefined
+  var error = ""
+  // A file of nothing but comments and white space is an empty file.
+  var stripped = stripJsonc(text || "{}")
+  try { raw = JSON.parse(stripped.trim() === "" ? "{}" : stripped) } catch (e) { error = "config parse failed, using defaults" }
   /** @type {string[]} */
   var unknownKeys = []
   if (raw && typeof raw === "object" && !Array.isArray(raw))
     unknownKeys = Object.keys(raw).filter(function(/** @type {string} */ k) {
       return k !== "$schema" && !Object.prototype.hasOwnProperty.call(DEFAULTS, k)
     }).sort()
-  return { config: normalizeConfig(raw), error: error, unknownKeys: unknownKeys }
+  var checked = checkConfig(raw)
+  return { config: checked.config, error: error, unknownKeys: unknownKeys, ignored: checked.ignored }
 }
 
 /**
@@ -421,9 +571,10 @@ function inlineJson(v) {
  *
  * @param {Config} config The effective config.
  * @param {string[]} unknownKeys Keys the user's file has that Ominous does not use.
+ * @param {string[]} ignored Values of the user's file that were refused (see checkConfig); may be left out.
  * @returns {string}
  */
-function formatConfig(config, unknownKeys) {
+function formatConfig(config, unknownKeys, ignored) {
   var cfg = /** @type {Object<string, *>} */ (/** @type {*} */ (config))
   var lines = [
     "// Ominous settings. Every key is optional: a missing key keeps its default.",
@@ -433,7 +584,9 @@ function formatConfig(config, unknownKeys) {
     "// Every key is explained at " + CONFIG_DOCS_URL
   ]
   if (unknownKeys.length > 0)
-    lines.push("// Unknown keys in your file, ignored: " + unknownKeys.join(", "))
+    lines.push("// Unknown keys in your file, ignored: " + unknownKeys.map(function(k) { return quoted(k) }).join(", "))
+  if (ignored && ignored.length > 0)
+    lines.push("// Values in your file that were ignored, so the default is used: " + ignored.join("; "))
   lines.push("{", "  " + JSON.stringify("$schema") + ": " + JSON.stringify(SCHEMA_URL) + ",")
   CONFIG_FIELDS.forEach(function(f, i) {
     var comma = i < CONFIG_FIELDS.length - 1 ? "," : ""
@@ -625,7 +778,7 @@ function statusSnapshot(events, cfg, nowMs) {
   var starts = (events || []).filter(function(ev) { return isAlertable(ev, cfg) && Number(ev.startMs) > nowMs })
                              .map(function(ev) { return Number(ev.startMs) })
   return { events: (events || []).length, upcomingAlertable: starts.length,
-           nextStart: starts.length ? new Date(Math.min.apply(null, starts)).toISOString() : null }
+           nextStart: starts.length ? new Date(starts.reduce(function(a, b) { return Math.min(a, b) })).toISOString() : null }
 }
 
 // ---------------------------------------------------------------- Timing on the card
@@ -695,28 +848,30 @@ function isOver(endMs, nowMs) {
 
 /**
  * Whether input is still swallowed. Keys and clicks right after the card appears are
- * ignored: it grabs focus mid-typing, and an Enter already on its way must not join a
- * meeting that has not been read yet.
+ * ignored: it grabs focus mid-typing, and an Enter or a space already on its way must not join
+ * or dismiss a meeting that has not been read yet. A key pressed while guarded starts the guard
+ * again, so someone still typing stays guarded until they pause for `guardMs`.
  *
  * @param {number} openedAtMs When the card opened, epoch milliseconds.
+ * @param {number} lastKeyMs When the last key swallowed by the guard was pressed, or 0.
  * @param {number} nowMs Now, epoch milliseconds.
- * @param {number} guardMs How long input is ignored.
+ * @param {number} guardMs How long input is ignored, and how long a pause ends the guard.
  * @returns {boolean}
  */
-function isGuarded(openedAtMs, nowMs, guardMs) {
-  return nowMs - openedAtMs < guardMs
+function isGuarded(openedAtMs, lastKeyMs, nowMs, guardMs) {
+  return nowMs - Math.max(openedAtMs, lastKeyMs) < guardMs
 }
 
 /**
- * The button selected when the card opens. Join is the default only for a link to a trusted
+ * The button selected when the card opens. Join is the default only for a link to a recognized
  * host; Enter on any other card dismisses it.
  *
  * @param {string} url The safe join link, or "".
- * @param {boolean} trusted Whether the link's host is trusted (joinTarget).
+ * @param {boolean} recognized Whether the link's host is recognized (joinTarget).
  * @returns {number} 0 = Join, 1 = Dismiss.
  */
-function initialSelection(url, trusted) {
-  return url !== "" && trusted ? 0 : 1
+function initialSelection(url, recognized) {
+  return url !== "" && recognized ? 0 : 1
 }
 
 /**
@@ -965,16 +1120,16 @@ function themeCommand(spec, overrides, available, activeMode) {
  * The meeting part of a payload, from an OmaCal agenda event.
  *
  * @param {AgendaEvent} ev The event.
- * @returns {Object} title, startMs, endMs, location, calendar and a safe url.
+ * @returns {Object} title, startMs, endMs, location, calendar (each as one cleaned line) and a safe url.
  */
 function eventPayload(ev) {
-  return { title: String(ev.title || "Meeting"), startMs: Number(ev.startMs), endMs: Number(ev.endMs) || 0,
-           location: String(ev.location || ""), calendar: String(ev.calendar || ""), url: safeUrl(ev.conference) }
+  return { title: cleanText(ev.title, 200) || "Meeting", startMs: Number(ev.startMs), endMs: Number(ev.endMs) || 0,
+           location: cleanText(ev.location, 200), calendar: cleanText(ev.calendar, 80), url: safeUrl(ev.conference) }
 }
 
 /**
  * The look part of a payload: timing, dimming, the mode, both themes (already normalized) and
- * the trusted join hosts.
+ * the recognized join hosts.
  *
  * @param {Config} cfg The config.
  * @param {string} mode The mode in use.
@@ -998,8 +1153,8 @@ function normalizePayload(p) {
   var lead = numberOrNaN(p.leadSeconds), tense = numberOrNaN(p.tenseSeconds)
   var themes = p.themes && typeof p.themes === "object" ? p.themes : {}
   return {
-    title: String(p.title || "Meeting"), startMs: Number(p.startMs) || 0, endMs: Number(p.endMs) || 0,
-    location: String(p.location || ""), calendar: String(p.calendar || ""), url: safeUrl(p.url),
+    title: cleanText(p.title, 200) || "Meeting", startMs: Number(p.startMs) || 0, endMs: Number(p.endMs) || 0,
+    location: cleanText(p.location, 200), calendar: cleanText(p.calendar, 80), url: safeUrl(p.url),
     dim: typeof p.dim === "number" ? p.dim : null,
     leadSeconds: isFinite(lead) && lead >= 0 ? lead : DEFAULTS.leadSeconds,
     tenseSeconds: isFinite(tense) && tense >= 0 ? tense : DEFAULTS.tenseSeconds,

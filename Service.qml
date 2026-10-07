@@ -32,9 +32,10 @@ Item {
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/ominous"
 
   property var config: Logic.normalizeConfig(null)
-  // What the last read of ominous.json found wrong: keys Ominous does not use, or why the file
-  // could not be read. Shown by `status` and in the log, never on the card.
+  // What the last read of ominous.json found wrong: keys Ominous does not use, values it refused,
+  // or why the file could not be read. Shown by `status` and in the log, never on the card.
   property var unknownKeys: []
+  property var ignoredValues: []
   property string configError: ""
   property string stateText: ""
   readonly property string mode: Logic.resolveMode(root.stateText, root.config)
@@ -56,16 +57,18 @@ Item {
 
   /**
    * Applies ominous.json's text; broken JSON keeps the defaults. Logs one line when the file has
-   * unknown keys or cannot be read, and keeps both for `status`.
+   * unknown keys, refused values or cannot be read, and keeps them for `status`.
    *
    * @param text The file's content.
    */
   function loadConfig(text: string): void {
     var r = Logic.parseConfig(text)
     if (r.error) root.log(r.error)
-    if (r.unknownKeys.length > 0) root.log("unknown key" + (r.unknownKeys.length > 1 ? "s" : "") + " in ominous.json (ignored): " + r.unknownKeys.join(", "))
+    if (r.unknownKeys.length > 0) root.log("unknown key" + (r.unknownKeys.length > 1 ? "s" : "") + " in ominous.json (ignored): " + r.unknownKeys.map(function(k) { return Logic.quoted(k) }).join(", "))
+    if (r.ignored.length > 0) root.log("ominous.json values ignored, the default is used: " + r.ignored.join("; "))
     root.config = r.config
     root.unknownKeys = r.unknownKeys
+    root.ignoredValues = r.ignored
     root.configError = r.error
   }
 
@@ -108,7 +111,7 @@ Item {
   function tick(): void {
     var ev = Logic.claimDue(root.events, Date.now(), root.config, root.fired)
     if (!ev) return
-    root.log("alert for event " + ev.eventId + (root.summon(root.payloadFor(ev)) ? "" : " (summon failed)"))
+    root.log("alert for event " + Logic.quoted(ev.eventId) + (root.summon(root.payloadFor(ev)) ? "" : " (summon failed)"))
   }
 
   /** Forgets alerts older than a day. */
@@ -300,11 +303,11 @@ Item {
 
     /**
      * IPC: the complete effective config as text for ominous.json: your values, the defaults for
-     * the rest, each key under a one-line comment, and the unknown keys of your file named at
-     * the top. Prints only; no file is written.
+     * the rest, each key under a one-line comment, and the unknown keys and refused values of
+     * your file named at the top. Prints only; no file is written.
      */
     function config(): string {
-      return Logic.formatConfig(root.config, root.unknownKeys)
+      return Logic.formatConfig(root.config, root.unknownKeys, root.ignoredValues)
     }
 
     /** IPC: the config and what is wrong with the file, counts and times, and the last error; never titles. */
@@ -313,6 +316,7 @@ Item {
       return JSON.stringify({
         config: root.config,
         unknownKeys: root.unknownKeys,
+        ignoredValues: root.ignoredValues,
         configError: root.configError,
         mode: root.mode,
         themes: root.themeNames,

@@ -41,13 +41,14 @@
         "whereby.com",
         "gotomeeting.com",
         "meet.goto.com",
-        "ringcentral.com",
+        "v.ringcentral.com",
         "8x8.vc",
         "meet.proton.me",
         "facetime.apple.com"
       ],
-      "description": "Meeting hosts you trust (subdomains too); your list replaces this one. Other links open with Dismiss selected.",
+      "description": "Meeting hosts where Join is selected first (subdomains too); your list replaces this one. Recognized means the service, not the meeting.",
       "examples": [
+        "meetings.ringcentral.com",
         "vc.larksuite.com",
         "vc.feishu.cn",
         "voovmeeting.com",

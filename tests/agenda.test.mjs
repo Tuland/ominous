@@ -117,3 +117,10 @@ describe("only meetings with a join link", () => {
     assert.equal(L.nextDue(events, now, { ...withLink, leadSeconds: 60 }, {})?.eventId, 2)
   })
 })
+
+describe("status with a huge agenda", () => {
+  test("the next start of 200000 events is found without a stack overflow", () => {
+    const events = Array.from({ length: 200000 }, (_, i) => ev({ eventId: i, startMs: now + 60_000 + i }))
+    assert.equal(L.statusSnapshot(events, cfg, now).nextStart, new Date(now + 60_000).toISOString())
+  })
+})

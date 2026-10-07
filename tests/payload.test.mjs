@@ -102,3 +102,28 @@ describe("preview", () => {
     }
   })
 })
+
+describe("calendar text on the card", () => {
+  test("line breaks and direction overrides become spaces, white space collapses, length is capped", () => {
+    assert.equal(L.cleanText("a\nb\r\nc\t d", 50), "a b c d")
+    assert.equal(L.cleanText("x\u2028y\u2029z\u202ew\u2066v", 50), "x y z w v")
+    assert.equal(L.cleanText("\n".repeat(500) + "end", 50), "end")
+    assert.equal(L.cleanText("x".repeat(500), 80).length, 80)
+    assert.equal(L.cleanText("Budget \u200f(Q3)\u200e", 50), "Budget (Q3)")
+    assert.equal(L.cleanText("x\u200by\u2060z\ufeffw\u061cv", 50), "x y z w v")
+    assert.equal(L.cleanText(null, 10), "")
+    assert.equal(L.cleanText("\ud83d\ude00".repeat(5), 5), "\ud83d\ude00".repeat(2))
+    assert.equal(L.cleanText("family \ud83d\udc68\u200d\ud83d\udc69", 50), "family \ud83d\udc68\u200d\ud83d\udc69")
+  })
+
+  test("title, place and calendar name are one bounded line in every payload", () => {
+    const ev = { title: "A\nB", startMs: 5, endMs: 9, location: "Room\n".repeat(300), calendar: "c".repeat(1000), conference: "https://meet.google.com/x" }
+    for (const p of [L.eventPayload(ev), L.normalizePayload(ev)]) {
+      assert.equal(p.title, "A B")
+      assert.ok(p.location.length <= 200 && !/\n/.test(p.location))
+      assert.equal(p.calendar.length, 80)
+    }
+    assert.equal(L.normalizePayload({ title: "\n\n" }).title, "Meeting")
+    assert.equal(L.eventPayload({ title: "   " }).title, "Meeting")
+  })
+})

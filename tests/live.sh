@@ -87,8 +87,8 @@ sum_before=$(md5sum "$CONFIG" 2>/dev/null | cut -d' ' -f1)
 status_shape() { jsonget "d['mode'] in ('professional','playful') and set(d['themes'])=={'professional','playful'} and 'themeError' in d and 'tenseSeconds' in d['config']" | grep -qx True; }
 check "status reports mode, themes, themeError and the config" status_shape
 
-config_report_shape() { jsonget "isinstance(d['unknownKeys'], list) and isinstance(d['configError'], str)" | grep -qx True; }
-check "status reports unknownKeys and configError" config_report_shape
+config_report_shape() { jsonget "isinstance(d['unknownKeys'], list) and isinstance(d['ignoredValues'], list) and isinstance(d['configError'], str)" | grep -qx True; }
+check "status reports unknownKeys, ignoredValues and configError" config_report_shape
 
 # What `config` prints, read back by Logic.js (comments and all), must be the config `status`
 # shows. node is a development tool of this repository, like the unit tests'.
@@ -100,7 +100,7 @@ config_round_trip() {
     const r = L.parseConfig(fs.readFileSync(process.argv[2], "utf8"))
     const shown = JSON.parse(fs.readFileSync(process.argv[3], "utf8")).config
     const same = JSON.stringify(JSON.parse(JSON.stringify(r.config))) === JSON.stringify(shown)
-    process.exit(r.error === "" && r.unknownKeys.length === 0 && same ? 0 : 1)
+    process.exit(r.error === "" && r.unknownKeys.length === 0 && r.ignored.length === 0 && same ? 0 : 1)
   ' "$(dirname "$0")/../Logic.js" "$BK/config.out" "$BK/status.out"
 }
 check "config prints a complete config that reads back to the one status shows" config_round_trip
@@ -224,6 +224,19 @@ if ((KEYS)); then
     else
       check "the card opened for the key checks" false
     fi
+    hide; wait_for 15 overlay_closed
+    # Someone still typing when the card appears stays guarded: a space every 300 ms for two
+    # seconds does nothing, and the first space after a one-second pause dismisses the card.
+    typing_keeps_guard() {
+      summon_unknown_link && wait_for 15 overlay_open || return 1
+      sleep 0.3
+      for _ in 1 2 3 4 5 6 7; do wtype -k space; sleep 0.3; done
+      overlay_open || return 1
+      sleep 1.4
+      wtype -k space
+      wait_for 15 overlay_closed
+    }
+    check "typing keeps the card guarded until a one-second pause" typing_keeps_guard
     hide; wait_for 15 overlay_closed
     # Enter on an unrecognized link dismisses the card and opens nothing: the link would show
     # in the command line of the browser launcher.

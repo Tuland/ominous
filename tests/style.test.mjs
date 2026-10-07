@@ -49,18 +49,29 @@ describe("QML", () => {
       assert.ok(root > 0 && blockAbove(lines, root) !== "", file + " has no /** */ block above its root object")
     })
 
-    test(file + " shows every Text as plain text", () => {
+    test(file + " shows every Text, Label, TextEdit and TextArea as plain text", () => {
       // Qt's default AutoText renders a string that looks like markup as rich text, and rich
-      // text loads <img> sources from the network: calendar data must never be parsed.
+      // text loads <img> sources from the network: calendar data must never be parsed. Label is
+      // a Text, TextEdit and TextArea show rich text too; TextInput and TextField do not.
+      // An element is found wherever it starts (`contentItem: Text {`, `QQC.Label {`), and only
+      // its own textFormat counts, not one of a nested element.
+      const opening = /(?:^\s*|[:{]\s*)(?:\w+\.)?(Text|Label|TextEdit|TextArea)\s*\{/
       lines.forEach((l, i) => {
-        if (!/^\s*Text\s*\{/.test(l)) return
-        let depth = 0, j = i, body = ""
+        const m = opening.exec(l)
+        if (!m) return
+        let depth = 0, j = i, own = false
+        let line = l.slice(m.index + m[0].length - 1)
         do {
-          for (const ch of lines[j]) depth += ch === "{" ? 1 : ch === "}" ? -1 : 0
-          body += lines[j] + "\n"
+          // Only a textFormat written at depth 1, inside this element and not a nested one.
+          for (const f of line.matchAll(/textFormat: Text\.PlainText/g)) {
+            const before = line.slice(0, f.index)
+            if (depth + (before.match(/\{/g) || []).length - (before.match(/\}/g) || []).length === 1) own = true
+          }
+          for (const ch of line) depth += ch === "{" ? 1 : ch === "}" ? -1 : 0
           j++
+          line = lines[j] || ""
         } while (depth > 0 && j < lines.length)
-        assert.match(body, /textFormat: Text\.PlainText/, file + ":" + (i + 1) + " has a Text without textFormat: Text.PlainText")
+        assert.ok(own, file + ":" + (i + 1) + " has a " + m[1] + " without its own textFormat: Text.PlainText")
       })
     })
 
@@ -110,7 +121,7 @@ describe("Python", () => {
 
 describe("APIs that run or load from a string", () => {
   // Argued in docs/development.md, "Security", which lists the same names.
-  const forbidden = ["eval(", "createQmlObject", "openUrlExternally", "Loader", "Image", "AnimatedImage", "XMLHttpRequest"]
+  const forbidden = ["eval(", "createQmlObject", "openUrlExternally", "Loader", "Image", "AnimatedImage", "XMLHttpRequest", "ToolTip"]
   const files = ["Logic.js", ...list(".", ".qml"), ...list("components", ".qml")].map((f) => f.replace(/^\.\//, ""))
   // Only code counts: a comment may name an API to say it is not used.
   const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
@@ -129,5 +140,22 @@ describe("APIs that run or load from a string", () => {
     const section = md.split("### APIs not allowed")[1].split("\n#")[0]
     const listed = [...section.matchAll(/^- `([^`]+)`$/gm)].map((m) => m[1])
     assert.deepEqual(listed, forbidden)
+  })
+})
+
+describe("lists written by hand that must not fall behind", () => {
+  test("every function of Logic.js is in the index at the top of the file", () => {
+    const text = read("Logic.js")
+    const index = text.split("// ---------------------------------------------------------------- Constants")[0]
+    for (const m of text.matchAll(/^function (\w+)\(/gm))
+      assert.match(index, new RegExp("\\b" + m[1] + "\\b"), "Logic.js: " + m[1] + " is not in the index at the top")
+  })
+
+  test("every component is named in docs/development.md and CLAUDE.md", () => {
+    for (const file of list("components", ".qml")) {
+      const name = file.replace(/^components\//, "").replace(/\.qml$/, "")
+      for (const doc of ["docs/development.md", "CLAUDE.md"])
+        assert.ok(read(doc).includes("`" + name + "`"), doc + " does not name the component `" + name + "`")
+    }
   })
 })

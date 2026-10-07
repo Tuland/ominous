@@ -20,9 +20,11 @@ rules:
       The last group of every change is "Review", the last task of the change: a code review
       and a security review of the change's own diff, read against its proposal, specs and
       design and against the "Security" section of docs/development.md (untrusted input,
-      sinks, APIs not allowed). Fix what they find inside the change; a finding that needs
-      a decision goes to the user. The change is done only when the Review group is ticked,
-      and it is committed after it.
+      sinks, APIs not allowed). Run it in a context separate from the one that wrote the
+      change (`/code-review` and `/security-review` in Claude Code, a reviewer agent
+      elsewhere): the author reads what they meant, a separate reviewer reads what is there.
+      Fix what it finds inside the change; a finding that needs a decision goes to the user.
+      The change is done only when the Review group is ticked, and it is committed after it.
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.

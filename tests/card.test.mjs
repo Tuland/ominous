@@ -36,9 +36,17 @@ describe("phases", () => {
 
 describe("the card's input rules", () => {
   test("input is swallowed for the first second only", () => {
-    assert.equal(L.isGuarded(now, now, 1000), true)
-    assert.equal(L.isGuarded(now, now + 999, 1000), true)
-    assert.equal(L.isGuarded(now, now + 1000, 1000), false)
+    assert.equal(L.isGuarded(now, 0, now, 1000), true)
+    assert.equal(L.isGuarded(now, 0, now + 999, 1000), true)
+    assert.equal(L.isGuarded(now, 0, now + 1000, 1000), false)
+  })
+
+  test("a key pressed while guarded keeps the card guarded until a one-second pause", () => {
+    // Typing a space every 300 ms from the moment the card opens: still guarded at 2.1 s.
+    assert.equal(L.isGuarded(now, now + 1800, now + 2100, 1000), true)
+    assert.equal(L.isGuarded(now, now + 1800, now + 2799, 1000), true)
+    assert.equal(L.isGuarded(now, now + 1800, now + 2800, 1000), false)
+    assert.equal(L.isGuarded(now, now - 5000, now + 1000, 1000), false)   // an older key than the card does not count
   })
 
   test("the card closes when the meeting ends, never for one without an end", () => {
@@ -48,7 +56,7 @@ describe("the card's input rules", () => {
     assert.equal(L.isOver(0, now), false)
   })
 
-  test("Join is the default only for a trusted link", () => {
+  test("Join is the default only for a recognized link", () => {
     assert.equal(L.initialSelection("https://meet.google.com/x", true), 0)
     assert.equal(L.initialSelection("https://evil.example/x", false), 1)
     assert.equal(L.initialSelection("", false), 1)

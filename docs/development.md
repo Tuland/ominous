@@ -24,7 +24,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `Logic.js` | Every decision, as pure functions with no QML types, indexed by section at the top. Anything with a decision in it goes here, with a unit test. |
 | `Service.qml` | Polls OmaCal, summons the card, watches the config, state and theme files, answers the `ominous` IPC target. |
 | `Alert.qml` | The card: window, layout, keys, the mode's state file. |
-| `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
+| `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `LinkNotice`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
 | `tools/make-config-docs.mjs` | Writes `docs/ominous.example.jsonc` and `docs/ominous.schema.json` from the config declaration in `Logic.js` (`--check` only compares); a unit test fails when they are stale. |
@@ -113,6 +113,9 @@ the code are for a why that the code cannot show.
 
 ## Security
 
+The reasons for this setup, the alternatives turned down and how to copy it to another project are
+in [review-gates.md](review-gates.md); this section is the map for this plugin.
+
 The plugin shows and acts on data it does not control: the calendar's owner can write a
 meeting's title, place, calendar name and link. Reviews look at that path at three levels:
 
@@ -120,19 +123,24 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 |---|---|---|
 | Every push | Unit tests, lint, art check | `.githooks/pre-push`, and the CI |
 | End of every change | Code review and security review of the change's diff, against its proposal and specs and the map below | The last task group, "Review", required by `rules.tasks` in `openspec/config.yaml` |
-| Before every release | Audit of the whole code, not the diff, and an update of the map | The "Audit" step of the `ominous-release` skill; a finding stops the release |
+| Before every release | Audit of the whole code, not the diff, and an update of the map | The "Review and audit" step of the `ominous-release` skill; a finding stops the release |
 
 ### The map: untrusted data to its uses
 
 | Source | Used for | Rule | Held by |
 |---|---|---|---|
-| OmaCal agenda: title, place, calendar name, link | Text on the card | Every `Text` is `Text.PlainText` (rich text can load remote images) | `tests/style.test.mjs` |
-| OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, no spaces or `\`) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened (`Logic.linkHost`, `Logic.joinTarget`) | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
+| OmaCal agenda: title, place, calendar name, link | Text on the card | Every `Text`, `Label`, `TextEdit` and `TextArea` is `Text.PlainText` (rich text can load remote images); title, place and calendar name are one cleaned line of bounded length (`Logic.cleanText`), so line breaks and direction overrides cannot reshape or reorder the card | `tests/style.test.mjs`, `tests/payload.test.mjs` |
+| OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, at most 2048 characters, with a host, no spaces, `\`, control characters, `$` or `%` in the host) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened, with every character outside printable ASCII escaped and the length capped (`Logic.linkHost`, `Logic.displayHost`, `Logic.joinTarget`); "recognized" means the service, not the meeting | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
 | OmaCal agenda: title and link | The journal and `status` | Only the event id is logged; `status` never prints a title | `tests/live.sh` |
 | IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again, `joinHosts` included | `tests/payload.test.mjs` |
-| `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.normalizeConfig`, `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
+| `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.checkConfig` (a refused value falls back to its default and is reported in `ignoredValues`), `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
 | User theme files | Colors and text of a sprite | `Logic.normalizeTheme`: colors only, sizes capped | `tests/themes.test.mjs` |
 | Long text from a calendar | The card's size | Elided or capped (title lines, captions, sprite size) | `tests/live.sh` (long title) |
+
+The browser is started by `omarchy-launch-browser`, which runs it through `systemd-run`; systemd
+expands `${VAR}` in the arguments, so a `$` in a link could change the host the browser opens.
+`Logic.safeUrl` refuses any link with a `$`. Title, place and calendar name are drawn clipped to
+their lines, so stacked combining marks cannot cover the buttons.
 
 The IPC is reachable only by the same user, who already has full access, so it is not a trust
 boundary; its payload is still checked, so a hand-made one behaves like a real alert.
@@ -149,7 +157,9 @@ None of these is in the plugin, and `tests/style.test.mjs` fails when one appear
 - `Image`
 - `AnimatedImage`
 - `XMLHttpRequest`
+- `ToolTip`
 
+`ToolTip` is Qt's own, whose text can be read as rich text: use the shell's `PanelToolTip`, which shows plain text.
 To use one, argue it in this section first (what data reaches it and why that is safe), and
 change the list here and in the test in the same change.
 

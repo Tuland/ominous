@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the unit checks (tests/run.sh --unit: unit tests, art check, lint) before a push and
 # blocks the push when one fails. It checks every push, whatever the branch or tag, except one
-# that only deletes refs. Enable it once per checkout:
+# that only deletes refs, and warns when the working tree is not clean or a pushed ref is not
+# the commit checked out, since the checks run on the working tree and not on what is pushed. Enable it once per checkout:
 #   git config core.hooksPath .githooks
 # Bypass it on purpose with `git push --no-verify`.
 
@@ -11,11 +12,24 @@ cd "$(dirname "$0")/.." || exit 2
 # Git gives one line per ref on standard input: <local ref> <local sha> <remote ref> <remote sha>.
 # A deletion has an all-zero local sha and leaves nothing to check; no line at all means
 # nothing to push.
-checked=0
+checked=0 other=0
+head=$(git rev-parse HEAD)
 while read -r _ local_sha _; do
-  [[ $local_sha =~ ^0+$ ]] || checked=1
+  [[ $local_sha =~ ^0+$ ]] && continue
+  checked=1
+  # A tag points to its commit through a tag object; compare commits.
+  [[ $(git rev-parse --verify --quiet "$local_sha^{commit}") == "$head" ]] || other=1
 done
 ((checked)) || exit 0
+
+# The checks run on the files on disk, not on the commits being pushed (common for a pre-push
+# hook: a quick signal, with the CI as the real check). Say so when the two can differ.
+if [[ -n $(git status --porcelain) ]]; then
+  echo "pre-push: warning: the working tree has changes or untracked files; the checks run on it, which may differ from what is pushed." >&2
+fi
+if ((other)); then
+  echo "pre-push: warning: a pushed ref is not the commit checked out; the checks run on the checkout, not on it." >&2
+fi
 
 # A hook runs in a non-interactive shell, where mise's activation does not happen, so the
 # pinned tools are reached through `mise exec`.

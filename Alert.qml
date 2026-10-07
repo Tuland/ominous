@@ -33,7 +33,8 @@ Item {
   property string location: ""
   property string calendar: ""
   property string url: ""
-  // The trusted join hosts (Logic.joinHosts), and what the link's host makes of them.
+  // The recognized join hosts (from the config, cleaned by Logic.hostList), and what the link's
+  // host makes of them.
   property var joinHosts: []
   property var targetScreen: null
   // null = the theme's menu scrim; a number = that opacity over the theme background.
@@ -47,8 +48,10 @@ Item {
   // ---- Time and input
   property real nowMs: Date.now()
   property real openedAtMs: 0
+  // The last key swallowed by the guard: typing keeps the card guarded (Logic.isGuarded).
+  property real guardKeyMs: 0
   readonly property int inputGuardMs: 1000
-  readonly property bool guarded: Logic.isGuarded(root.openedAtMs, root.nowMs, root.inputGuardMs)
+  readonly property bool guarded: Logic.isGuarded(root.openedAtMs, root.guardKeyMs, root.nowMs, root.inputGuardMs)
   // 0 = Join, 1 = Dismiss. Arrows and Tab move it, Enter/Space activate it.
   property int selected: 0
 
@@ -107,7 +110,7 @@ Item {
     root.calendar = p.calendar
     root.url = p.url
     root.joinHosts = p.joinHosts
-    root.selected = Logic.initialSelection(root.url, root.target.trusted)
+    root.selected = Logic.initialSelection(root.url, root.target.recognized)
     root.dim = p.dim
     root.leadSeconds = p.leadSeconds
     root.tenseSeconds = p.tenseSeconds
@@ -118,6 +121,7 @@ Item {
     root.targetScreen = Quickshell.screens.find(function(s) { return mon && s.name === mon.name }) || null
     root.nowMs = Date.now()
     root.openedAtMs = root.nowMs
+    root.guardKeyMs = 0
     sprite.reset()
     root.opened = true
     // An alert that opens late is already angry: it jolts on arrival too.
@@ -230,7 +234,10 @@ Item {
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) {
           event.accepted = true
-          if (root.guarded) return
+          if (root.guarded) {
+            root.guardKeyMs = Date.now()
+            return
+          }
           if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) root.activate()
           else if (event.key === Qt.Key_Escape) root.dismiss()
           else if (event.key === Qt.Key_M) root.toggleMode()
@@ -286,7 +293,10 @@ Item {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             font.letterSpacing: 1.5
+            maximumLineCount: 1
             elide: Text.ElideRight
+            // Calendar text: combining marks stacked on a letter must not draw outside the line.
+            clip: true
           }
 
           ModeSwitch {
@@ -313,6 +323,7 @@ Item {
           wrapMode: Text.Wrap
           maximumLineCount: 3
           elide: Text.ElideRight
+          clip: true
         }
 
         Text {
@@ -323,7 +334,9 @@ Item {
           color: root.mutedColor
           font.family: Style.font.family
           font.pixelSize: Style.font.heading
+          maximumLineCount: 1
           elide: Text.ElideRight
+          clip: true
         }
 
         Text {
@@ -370,10 +383,12 @@ Item {
           }
 
           LinkNotice {
-            visible: root.url !== "" && !root.target.trusted
+            visible: root.url !== "" && !root.target.recognized
             anchors.verticalCenter: parent.verticalCenter
             text: Logic.unknownLinkTip(root.target.host)
             showWhile: root.selected === 0
+            active: root.opened
+            bounds: card
             textColor: root.textColor
             mutedColor: root.mutedColor
           }

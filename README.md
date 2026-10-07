@@ -54,6 +54,7 @@ rm -rf ~/.local/state/ominous           # the remembered mode and theme choice
 - [Configuration](docs/configuration.md) — `ominous.json` and where your choices are saved
 - [Making a theme](docs/custom-themes.md) — the theme file format
 - [Development](docs/development.md) — layout, tests, drawing the characters
+- [Review gates](docs/review-gates.md) — the review setup (hook, per-change and release reviews) and why
 - [Changelog](CHANGELOG.md) — what each version changed
 
 ## Credits

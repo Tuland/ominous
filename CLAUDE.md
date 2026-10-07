@@ -21,8 +21,8 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   index at its top lists them by section. Anything with a decision in it goes here, with a unit
   test; the QML files stay glue.
 - `components/` — QML pieces with explicit properties in and signals out, never reaching into the
-  file that uses them: `ActionButton`, `ModeSwitch`, `ProgressLine`, `PixelSprite`, `PhaseSprite`
-  (frames and the angry jolt) for the card; `ThemeSlot` / `ThemeFile` (one mode's theme, watched)
+  file that uses them: `ActionButton`, `ModeSwitch`, `LinkNotice` (the "?" and its tooltip), `ProgressLine`, `PixelSprite`,
+  `PhaseSprite` (frames and the angry jolt) for the card; `ThemeSlot` / `ThemeFile` (one mode's theme, watched)
   for the service.
 - `themes/` — the shipped themes. `marine`, `shiba` and `boss` are drawn by
   `tools/draw-themes.py`: change the art there and rerun it, never the JSON by hand
