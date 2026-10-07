@@ -6,6 +6,8 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
 ### Added
 - `joinHosts` in `ominous.json`: the meeting hosts where Join is selected first (subdomains
   included). The default holds 17 hosts of the main services, FaceTime included, each the
@@ -102,6 +104,7 @@ All notable changes to Ominous are listed here. The format follows
 - Configuration in `~/.config/omarchy/ominous.json`: `calendars`, `leadSeconds`, `dim`.
 - `omarchy-shell ominous test` and `status`.
 
-[Unreleased]: https://github.com/Tuland/ominous/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Tuland/ominous/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Tuland/ominous/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Tuland/ominous/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Tuland/ominous/releases/tag/v0.1.0
