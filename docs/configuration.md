@@ -7,6 +7,7 @@ writes it.
 |---|---|---|
 | `calendars` | `[]` | Calendar names or ids (as `omacal calendars` lists them) that alert. Empty = all. |
 | `onlyWithLink` | `false` | `true` = alert only for meetings with a join link (an `https://` conference link from OmaCal). A link written only in the location does not count. |
+| `joinHosts` | 17 meeting hosts, see below | The hosts whose links are trusted (subdomains included). Your list **replaces** the default. |
 | `leadSeconds` | `60` | How long before the start the card appears (0–3600). |
 | `tenseSeconds` | `15` | How long before the start the card turns from relaxed to tense (0–3600). `0` skips the tense phase. |
 | `dim` | theme | Opacity of the veil over the rest of the monitor, `0`–`1`. Unset = the theme's menu scrim. |
@@ -33,6 +34,29 @@ comment to keep an option at hand without it taking effect:
   // "onlyWithLink": true,
 }
 ```
+
+## Join hosts
+
+A link comes from the calendar, and on a shared calendar its owner chooses it, so Ominous only
+makes **Join** the default for a host you trust. The default list holds Google Meet
+(`meet.google.com`), Zoom (`zoom.us`, `zoom.com`, `zoomgov.com`), Microsoft Teams
+(`teams.microsoft.com`, `teams.live.com`, `teams.microsoft.us`, `teams.cloud.microsoft`), Webex
+(`webex.com`), Jitsi (`meet.jit.si`), Whereby (`whereby.com`), GoTo (`gotomeeting.com`,
+`meet.goto.com`), RingCentral (`ringcentral.com`), 8x8 (`8x8.vc`), Proton Meet (`meet.proton.me`)
+and FaceTime (`facetime.apple.com`).
+
+- A host covers its **subdomains at any depth**, in any case: `zoom.us` covers
+  `us02web.zoom.us`. Names that only look alike (`zoom.us.evil.example`, `evilzoom.us`) are not
+  covered. Add the narrowest host that is yours, such as `meet.google.com`, not `google.com`.
+- The list you write is the whole list. To keep the default and add one, copy the default
+  (`omarchy-shell ominous config` prints it) and add yours. `[]` trusts nothing.
+- `omarchy-shell ominous config` and [`ominous.example.jsonc`](ominous.example.jsonc) also list
+  other meeting hosts, commented out: remove the `//` in front of one to trust it too.
+
+For any other host, the card opens with **Dismiss** selected, so `Enter` opens nothing. The
+button reads "Join on" and the host the browser would open (shortened with "…" when long), and a
+"?" next to it explains why. Choose Join to open the link anyway. Only the host counts: a link
+such as `https://meet.google.com@evil.example/` has the host `evil.example`.
 
 ## Every key at a glance
 

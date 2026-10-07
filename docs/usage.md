@@ -21,8 +21,12 @@ Which meetings alert:
 
 ## On the card
 
-- Two buttons, **Join on …** (selected) and **Dismiss**: `←`/`→` or `Tab` move between them,
+- Two buttons, **Join on …** (selected for a trusted link) and **Dismiss**: `←`/`→` or `Tab` move between them,
   `Enter`/`Space` or a click activates. Only `https://` links are opened.
+- Join is selected only for a link to a [trusted host](configuration.md#join-hosts). For any other
+  link **Dismiss** is selected, the button shows the real host ("Join on evil.example") and a
+  "?" explains that the link is not recognized: the tooltip shows when you move to Join, on
+  hover and on a click of the "?". Add the host to `joinHosts` to trust it.
 - `Esc` or a click outside the card: dismiss.
 - `M`, or the small switch at the top right: flip between the **professional** and the
   **playful** mode. The choice is remembered for the next alerts; see [themes](themes.md).

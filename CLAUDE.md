@@ -35,7 +35,7 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
 - Everything in English: code, comments, UI strings, docs, commit messages.
 - No personal or employer data anywhere: no real emails, calendar names, meeting links, home
   paths. Use placeholders such as `work@example.com`.
-- Calendar data is untrusted input: only `https://` URLs are ever opened (`Logic.safeUrl`).
+- Calendar data is untrusted input: only `https://` URLs are ever opened (`Logic.safeUrl`), and Join is the default only for a host in `joinHosts` (`Logic.joinTarget`).
 - The status IPC never prints meeting titles.
 - Theme art is original: no traced sprites, no third-party names or trademarks in theme names.
 - The plugin ID `io.github.tuland.ominous` is permanent (marketplace rule): never change it.

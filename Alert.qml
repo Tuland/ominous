@@ -33,6 +33,8 @@ Item {
   property string location: ""
   property string calendar: ""
   property string url: ""
+  // The trusted join hosts (Logic.joinHosts), and what the link's host makes of them.
+  property var joinHosts: []
   property var targetScreen: null
   // null = the theme's menu scrim; a number = that opacity over the theme background.
   property var dim: null
@@ -55,7 +57,7 @@ Item {
   readonly property string phase: Logic.phase(root.startMs, root.nowMs, root.tenseSeconds)
   readonly property var phaseSpec: root.theme.phases[root.phase]
   readonly property bool started: root.phase === "angry"
-  readonly property string providerName: Logic.provider(root.url)
+  readonly property var target: Logic.joinTarget(root.url, root.joinHosts)
   readonly property real progressFraction: Logic.progress(root.startMs, root.endMs, root.nowMs, root.leadSeconds)
 
   readonly property color cardColor: Color.notifications.background
@@ -104,7 +106,8 @@ Item {
     root.location = p.location
     root.calendar = p.calendar
     root.url = p.url
-    root.selected = Logic.initialSelection(root.url)
+    root.joinHosts = p.joinHosts
+    root.selected = Logic.initialSelection(root.url, root.target.trusted)
     root.dim = p.dim
     root.leadSeconds = p.leadSeconds
     root.tenseSeconds = p.tenseSeconds
@@ -356,7 +359,7 @@ Item {
 
           ActionButton {
             visible: root.url !== ""
-            label: "Join on " + root.providerName
+            label: "Join on " + root.target.label
             current: root.selected === 0
             guarded: root.guarded
             accent: root.signalColor
@@ -364,6 +367,15 @@ Item {
             textColor: root.textColor
             mutedColor: root.mutedColor
             onActivated: root.join()
+          }
+
+          LinkNotice {
+            visible: root.url !== "" && !root.target.trusted
+            anchors.verticalCenter: parent.verticalCenter
+            text: Logic.unknownLinkTip(root.target.host)
+            showWhile: root.selected === 0
+            textColor: root.textColor
+            mutedColor: root.mutedColor
           }
 
           ActionButton {

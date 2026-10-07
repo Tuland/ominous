@@ -192,6 +192,20 @@ for phase in relaxed tense angry; do
 done
 check "a very long title still opens" preview_opens "relaxed playful $(printf 'word%.0s ' {1..60})Supercalifragilisticexpialidocious_without_spaces"
 
+# ---- an unrecognized link
+UNKNOWN_LINK=https://evil.example/ominous-live-check
+# Summons a card for a meeting whose link is not in the join hosts.
+summon_unknown_link() {
+  local payload
+  payload=$(python3 -c 'import json, sys, time; n = time.time() * 1000; print(json.dumps({"title": "Live check", "startMs": n + 600000, "endMs": n + 1800000, "leadSeconds": 900, "url": sys.argv[1]}))' "$UNKNOWN_LINK")
+  omarchy-shell shell summon "$ID" "$payload" >/dev/null
+}
+unknown_link_opens() {
+  summon_unknown_link && wait_for 15 overlay_open || return 1
+  hide; wait_for 15 overlay_closed
+}
+check "a card with an unrecognized link opens and closes" unknown_link_opens
+
 # ---- keys (opt-in)
 state_mode_is() { [[ $(python3 -c "import json;print(json.load(open('$STATE'))['mode'])" 2>/dev/null) == "$1" ]]; }
 if ((KEYS)); then
@@ -211,6 +225,17 @@ if ((KEYS)); then
       check "the card opened for the key checks" false
     fi
     hide; wait_for 15 overlay_closed
+    # Enter on an unrecognized link dismisses the card and opens nothing: the link would show
+    # in the command line of the browser launcher.
+    enter_dismisses_unknown_link() {
+      summon_unknown_link && wait_for 15 overlay_open || return 1
+      sleep 1.4   # past the input guard
+      wtype -k Return
+      wait_for 15 overlay_closed || return 1
+      sleep 1; ! pgrep -f 'omarchy-launch-browser.*ominous-live-check' >/dev/null
+    }
+    check "Enter on an unrecognized link dismisses it and opens nothing" enter_dismisses_unknown_link
+    hide
   else
     echo "SKIP key checks: wtype not installed"
   fi

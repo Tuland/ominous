@@ -4,7 +4,7 @@
 // in tests/ run them under node, and Service.qml and Alert.qml stay glue.
 //
 //   Constants
-//   Values and links ......... numberOrNaN, isThemeName, safeUrl, provider
+//   Values and links ......... numberOrNaN, isThemeName, safeUrl, linkHost, shortHost, hostList, joinTarget, unknownLinkTip
 //   Config and saved state ... normalizeConfig, stripJsonc, parseConfig, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
 //   Agenda ................... isAlertable, eventKey, nextDue, claimDue, pruneFired, statusSnapshot
 //   Timing on the card ....... phase, progress, countdown, isOver
@@ -14,6 +14,33 @@
 //   Payloads ................. eventPayload, look, normalizePayload, previewPayload
 
 // ---------------------------------------------------------------- Constants
+
+/** The meeting hosts trusted when ominous.json has no joinHosts. */
+var DEFAULT_JOIN_HOSTS = [
+  "meet.google.com", "zoom.us", "zoom.com", "zoomgov.com", "teams.microsoft.com", "teams.live.com",
+  "teams.microsoft.us", "teams.cloud.microsoft", "webex.com", "meet.jit.si", "whereby.com",
+  "gotomeeting.com", "meet.goto.com", "ringcentral.com", "8x8.vc", "meet.proton.me", "facetime.apple.com"
+]
+
+/** Other meeting hosts, shown commented out in the printed config for the user to enable. */
+var OPTIONAL_JOIN_HOSTS = [
+  "vc.larksuite.com", "vc.feishu.cn", "voovmeeting.com", "cliq.zoho.eu", "meeting.zoho.com",
+  "call.lifesizecloud.com", "app.livestorm.com", "event.demio.com", "streamyard.com", "riverside.fm",
+  "tuple.app", "meet.pumble.com", "join.gong.io", "go.chorus.ai", "doxy.me"
+]
+
+/**
+ * The service name the Join button shows for a trusted host under one of these (host suffix,
+ * name); a trusted host under none is shown as itself.
+ */
+var SERVICE_NAMES = [
+  ["meet.google.com", "Meet"], ["zoom.us", "Zoom"], ["zoom.com", "Zoom"], ["zoomgov.com", "Zoom"],
+  ["teams.microsoft.com", "Teams"], ["teams.live.com", "Teams"], ["teams.microsoft.us", "Teams"],
+  ["teams.cloud.microsoft", "Teams"], ["webex.com", "Webex"], ["meet.jit.si", "Jitsi"],
+  ["whereby.com", "Whereby"], ["gotomeeting.com", "GoTo"], ["meet.goto.com", "GoTo"],
+  ["ringcentral.com", "RingCentral"], ["8x8.vc", "8x8"], ["meet.proton.me", "Proton Meet"],
+  ["facetime.apple.com", "FaceTime"]
+]
 
 /**
  * The one declaration of every key ominous.json reads, in the order the printed config shows
@@ -29,6 +56,9 @@ var CONFIG_FIELDS = [
   { key: "onlyWithLink", default: false,
     description: "true = alert only for meetings with an https join link.",
     schema: { type: "boolean" } },
+  { key: "joinHosts", default: DEFAULT_JOIN_HOSTS, optional: OPTIONAL_JOIN_HOSTS,
+    description: "Meeting hosts you trust (subdomains too); your list replaces this one. Other links open with Dismiss selected.",
+    schema: { type: "array", items: { type: "string", pattern: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+\\.?$" } } },
   { key: "leadSeconds", default: 60,
     description: "Seconds before the start when the card appears (0-3600).",
     schema: { type: "integer", minimum: 0, maximum: 3600 } },
@@ -86,6 +116,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {*} default  The value when the key is missing or invalid.
  * @property {string} description  One line, shown above the key in the printed config.
  * @property {Object<string, *>} schema  The JSON Schema fragment for the value.
+ * @property {string[]} [optional]  Values of a list that are shown commented out, to enable.
  *
  * @typedef {Object} Config  ominous.json after normalizeConfig; every field has its default.
  * @property {string[]} calendars  Lowercased calendar names or ids; empty = every calendar.
@@ -95,6 +126,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {string} mode  "professional" or "playful".
  * @property {{professional: string, playful: string}} themes  Theme name per mode.
  * @property {boolean} onlyWithLink  Alert only for meetings with an https join link.
+ * @property {string[]} joinHosts  Lowercase hosts whose links are trusted, subdomains included.
  *
  * @typedef {Object} AgendaEvent  One event of `omacal agenda --json` (untrusted input).
  * @property {string} eventId
@@ -138,6 +170,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {number} tenseSeconds
  * @property {string} mode
  * @property {{professional: Theme, playful: Theme}} themes
+ * @property {string[]} joinHosts  The trusted join hosts.
  */
 
 // ---------------------------------------------------------------- Values and links
@@ -177,21 +210,90 @@ function safeUrl(url) {
 }
 
 /**
- * The name of the meeting service behind a link, for the Join button.
+ * The host a browser connects to for a link: after `https://`, before the first `/`, `?` or
+ * `#`, without user information (everything up to the last `@`), without a port or a trailing
+ * dot, in lower case. The same value is checked and shown, so what the user reads is what opens.
  *
  * @param {*} url The join link.
- * @returns {string} "Meet", "Teams", "Zoom", "Webex", "Jitsi" or "Whereby"; "browser" for
- *     another https link; "" when there is no safe link.
+ * @returns {string} The host, or "" when there is no safe link.
  */
-function provider(url) {
-  var m = /^https:\/\/([^\/:?#]+)/i.exec(safeUrl(url))
+function linkHost(url) {
+  var m = /^https:\/\/([^\/?#]*)/i.exec(safeUrl(url))
   if (!m) return ""
-  var host = m[1].toLowerCase()
-  var known = [["meet.google.com", "Meet"], ["teams.microsoft.com", "Teams"], ["teams.live.com", "Teams"],
-               ["zoom.us", "Zoom"], ["webex.com", "Webex"], ["meet.jit.si", "Jitsi"], ["whereby.com", "Whereby"]]
-  for (var i = 0; i < known.length; i++)
-    if (host === known[i][0] || host.slice(-(known[i][0].length + 1)) === "." + known[i][0]) return known[i][1]
-  return "browser"
+  var authority = m[1]
+  return authority.slice(authority.lastIndexOf("@") + 1).replace(/:\d*$/, "").replace(/\.+$/, "").toLowerCase()
+}
+
+/**
+ * A host short enough for the Join button: a long one loses its start, since its end is what
+ * says whose it is.
+ *
+ * @param {string} host A host from linkHost.
+ * @returns {string} The host, or "…" and its last 32 characters.
+ */
+function shortHost(host) {
+  return host.length > 32 ? "\u2026" + host.slice(-32) : host
+}
+
+/**
+ * Cleans a list of trusted hosts: entries trimmed, lower-cased, without a trailing dot, kept
+ * only when they are plain host names with at least one dot, no duplicates.
+ *
+ * @param {*} raw The list from ominous.json or a payload.
+ * @returns {string[]} The valid hosts in their order; an empty list when raw is not a list.
+ */
+function hostList(raw) {
+  /** @type {string[]} */
+  var out = []
+  if (!Array.isArray(raw)) return out
+  raw.forEach(function(/** @type {*} */ h) {
+    var host = String(h).trim().toLowerCase().replace(/\.$/, "")
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && out.indexOf(host) < 0) out.push(host)
+  })
+  return out
+}
+
+/**
+ * Whether a host is a trusted host or a subdomain of one, at any depth.
+ *
+ * @param {string} host A host from linkHost.
+ * @param {string[]} hosts The trusted hosts.
+ * @returns {boolean}
+ */
+function hostIn(host, hosts) {
+  return hosts.some(function(h) { return host === h || host.slice(-(h.length + 1)) === "." + h })
+}
+
+/**
+ * What the Join button needs to know about a link.
+ *
+ * @param {*} url The join link.
+ * @param {string[]} hosts The trusted hosts.
+ * @returns {{host: string, trusted: boolean, label: string}} The host that opens; whether it is
+ *     trusted; the button's name for it: the service name for a trusted host of a known service,
+ *     else the (shortened) host. All empty when there is no safe link.
+ */
+function joinTarget(url, hosts) {
+  var host = linkHost(url)
+  if (host === "") return { host: "", trusted: false, label: "" }
+  var trusted = hostIn(host, hosts)
+  var label = shortHost(host)
+  if (trusted)
+    for (var i = 0; i < SERVICE_NAMES.length; i++)
+      if (hostIn(host, [SERVICE_NAMES[i][0]])) { label = SERVICE_NAMES[i][1]; break }
+  return { host: host, trusted: trusted, label: label }
+}
+
+/**
+ * The tooltip of the "?" beside the Join button of an unrecognized link.
+ *
+ * @param {string} host The link's host.
+ * @returns {string} Plain text, a few lines.
+ */
+function unknownLinkTip(host) {
+  var tip = "Link not recognized: " + host + ".\nAdd it to joinHosts in ~/.config/omarchy/ominous.json to trust it."
+  if (/[^\x00-\x7f]/.test(host)) tip += "\nIt has non-Latin characters and may imitate another address."
+  return tip
 }
 
 // ---------------------------------------------------------------- Config and saved state
@@ -209,7 +311,7 @@ function normalizeConfig(raw) {
     calendars: DEFAULTS.calendars.slice(), leadSeconds: DEFAULTS.leadSeconds, dim: DEFAULTS.dim,
     tenseSeconds: DEFAULTS.tenseSeconds, mode: DEFAULTS.mode,
     themes: { professional: DEFAULTS.themes.professional, playful: DEFAULTS.themes.playful },
-    onlyWithLink: DEFAULTS.onlyWithLink
+    onlyWithLink: DEFAULTS.onlyWithLink, joinHosts: DEFAULTS.joinHosts.slice()
   }
   if (!raw || typeof raw !== "object") return cfg
   if (Array.isArray(raw.calendars))
@@ -225,6 +327,7 @@ function normalizeConfig(raw) {
   if (raw.themes && typeof raw.themes === "object")
     MODES.forEach(function(m) { if (isThemeName(raw.themes[m])) cfg.themes[m] = raw.themes[m] })
   if (raw.onlyWithLink === true) cfg.onlyWithLink = true
+  if (Array.isArray(raw.joinHosts)) cfg.joinHosts = hostList(raw.joinHosts)
   return cfg
 }
 
@@ -333,8 +436,18 @@ function formatConfig(config, unknownKeys) {
     lines.push("// Unknown keys in your file, ignored: " + unknownKeys.join(", "))
   lines.push("{", "  " + JSON.stringify("$schema") + ": " + JSON.stringify(SCHEMA_URL) + ",")
   CONFIG_FIELDS.forEach(function(f, i) {
-    lines.push("", "  // " + f.description,
-               "  " + JSON.stringify(f.key) + ": " + inlineJson(cfg[f.key]) + (i < CONFIG_FIELDS.length - 1 ? "," : ""))
+    var comma = i < CONFIG_FIELDS.length - 1 ? "," : ""
+    lines.push("")
+    lines.push("  // " + f.description)
+    if (f.optional) {
+      var active = /** @type {string[]} */ (cfg[f.key])
+      lines.push("  " + JSON.stringify(f.key) + ": [")
+      active.forEach(function(v) { lines.push("    " + JSON.stringify(v) + ",") })
+      f.optional.forEach(function(v) { if (active.indexOf(v) < 0) lines.push("    // " + JSON.stringify(v) + ",") })
+      lines.push("  ]" + comma)
+    } else {
+      lines.push("  " + JSON.stringify(f.key) + ": " + inlineJson(cfg[f.key]) + comma)
+    }
   })
   lines.push("}", "")
   return lines.join("\n")
@@ -358,6 +471,7 @@ function configSchema() {
     for (var k in f.schema) p[k] = f.schema[k]
     p.default = f.default
     p.description = f.description
+    if (f.optional) p.examples = f.optional.slice()
     properties[f.key] = p
   })
   return {
@@ -594,14 +708,15 @@ function isGuarded(openedAtMs, nowMs, guardMs) {
 }
 
 /**
- * The button selected when the card opens. Join is only ever the default when there is a
- * link.
+ * The button selected when the card opens. Join is the default only for a link to a trusted
+ * host; Enter on any other card dismisses it.
  *
  * @param {string} url The safe join link, or "".
+ * @param {boolean} trusted Whether the link's host is trusted (joinTarget).
  * @returns {number} 0 = Join, 1 = Dismiss.
  */
-function initialSelection(url) {
-  return url !== "" ? 0 : 1
+function initialSelection(url, trusted) {
+  return url !== "" && trusted ? 0 : 1
 }
 
 /**
@@ -858,7 +973,8 @@ function eventPayload(ev) {
 }
 
 /**
- * The look part of a payload: timing, dimming, the mode and both themes (already normalized).
+ * The look part of a payload: timing, dimming, the mode, both themes (already normalized) and
+ * the trusted join hosts.
  *
  * @param {Config} cfg The config.
  * @param {string} mode The mode in use.
@@ -866,7 +982,8 @@ function eventPayload(ev) {
  * @returns {Object}
  */
 function look(cfg, mode, themes) {
-  return { dim: cfg.dim, leadSeconds: cfg.leadSeconds, tenseSeconds: cfg.tenseSeconds, mode: mode, themes: themes }
+  return { dim: cfg.dim, leadSeconds: cfg.leadSeconds, tenseSeconds: cfg.tenseSeconds, mode: mode, themes: themes,
+           joinHosts: cfg.joinHosts }
 }
 
 /**
@@ -887,6 +1004,7 @@ function normalizePayload(p) {
     leadSeconds: isFinite(lead) && lead >= 0 ? lead : DEFAULTS.leadSeconds,
     tenseSeconds: isFinite(tense) && tense >= 0 ? tense : DEFAULTS.tenseSeconds,
     mode: p.mode === "playful" ? "playful" : "professional",
+    joinHosts: Array.isArray(p.joinHosts) ? hostList(p.joinHosts) : DEFAULTS.joinHosts.slice(),
     // normalizeTheme({}) is never null: an empty object is a valid, empty theme.
     themes: { professional: normalizeTheme(themes.professional) || /** @type {Theme} */ (normalizeTheme({})),
               playful: normalizeTheme(themes.playful) || /** @type {Theme} */ (normalizeTheme({})) }

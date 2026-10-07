@@ -26,10 +26,6 @@ describe("agenda", () => {
   test("urls are https only", () => {
     assert.equal(L.safeUrl("javascript:alert(1)"), "")
     assert.equal(L.safeUrl("https://meet.google.com/a b"), "")
-    assert.equal(L.provider("https://meet.google.com/abc-defg-hij"), "Meet")
-    assert.equal(L.provider("https://acme.zoom.us/j/1"), "Zoom")
-    assert.equal(L.provider("https://evilzoom.us/j/1"), "browser")
-    assert.equal(L.provider(null), "")
   })
 
   test("countdown text", () => {

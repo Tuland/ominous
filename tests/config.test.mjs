@@ -175,13 +175,35 @@ describe("the printed config", () => {
 
   test("reads back to the same config, comments and all", () => {
     for (const raw of [null, { leadSeconds: 90, dim: 0.5, mode: "playful", onlyWithLink: true,
-                              calendars: ["a", "b"], themes: { playful: "shiba" } }]) {
+                              calendars: ["a", "b"], themes: { playful: "shiba" } },
+                              { joinHosts: [] }, { joinHosts: ["meet.acme.example", "zoom.us"] }]) {
       const cfg = L.normalizeConfig(raw)
       const r = L.parseConfig(L.formatConfig(cfg, []))
       assert.equal(r.error, "")
       assert.deepEqual([...r.unknownKeys], [])
       assert.deepEqual(plain(r.config), plain(cfg))
     }
+  })
+
+  test("optional values are commented out in their list, and not repeated when active", () => {
+    const out = L.formatConfig(L.normalizeConfig(null), [])
+    const list = out.slice(out.indexOf('"joinHosts": ['), out.indexOf("]", out.indexOf('"joinHosts": [')))
+    for (const h of L.DEFAULTS.joinHosts) assert.ok(list.includes(`\n    "${h}",`), h)
+    const optional = [...L.CONFIG_FIELDS].find((f) => f.key === "joinHosts").optional
+    assert.ok(optional.length > 0)
+    for (const h of optional) assert.ok(list.includes(`\n    // "${h}",`), h)
+    const on = L.formatConfig(L.normalizeConfig({ joinHosts: ["zoom.us", optional[0]] }), [])
+    assert.ok(on.includes(`\n    "${optional[0]}",`))
+    assert.ok(!on.includes(`// "${optional[0]}"`))
+    assert.ok(on.includes(`// "${optional[1]}"`))
+  })
+
+  test("removing // in front of an optional host trusts it as well", () => {
+    const out = L.formatConfig(L.normalizeConfig(null), [])
+    const host = [...L.CONFIG_FIELDS].find((f) => f.key === "joinHosts").optional[0]
+    assert.ok(!L.parseConfig(out).config.joinHosts.includes(host))
+    const edited = L.parseConfig(out.replace(`// "${host}"`, `"${host}"`)).config
+    assert.deepEqual([...edited.joinHosts], [...L.DEFAULTS.joinHosts, host])
   })
 
   test("names unknown keys in the header, only when there are some", () => {
@@ -231,6 +253,11 @@ describe("the config schema", () => {
       assert.deepEqual(schema.properties[f.key].default, plain(f.default), f.key)
       assert.equal(schema.properties[f.key].description, f.description, f.key)
     }
+  })
+
+  test("a list field with optional values offers them as examples", () => {
+    assert.deepEqual(schema.properties.joinHosts.examples, plain([...L.CONFIG_FIELDS].find((f) => f.key === "joinHosts").optional))
+    assert.equal(schema.properties.leadSeconds.examples, undefined)
   })
 
   test("every default satisfies its own constraints", () => {

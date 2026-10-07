@@ -12,6 +12,42 @@
   // true = alert only for meetings with an https join link.
   "onlyWithLink": false,
 
+  // Meeting hosts you trust (subdomains too); your list replaces this one. Other links open with Dismiss selected.
+  "joinHosts": [
+    "meet.google.com",
+    "zoom.us",
+    "zoom.com",
+    "zoomgov.com",
+    "teams.microsoft.com",
+    "teams.live.com",
+    "teams.microsoft.us",
+    "teams.cloud.microsoft",
+    "webex.com",
+    "meet.jit.si",
+    "whereby.com",
+    "gotomeeting.com",
+    "meet.goto.com",
+    "ringcentral.com",
+    "8x8.vc",
+    "meet.proton.me",
+    "facetime.apple.com",
+    // "vc.larksuite.com",
+    // "vc.feishu.cn",
+    // "voovmeeting.com",
+    // "cliq.zoho.eu",
+    // "meeting.zoho.com",
+    // "call.lifesizecloud.com",
+    // "app.livestorm.com",
+    // "event.demio.com",
+    // "streamyard.com",
+    // "riverside.fm",
+    // "tuple.app",
+    // "meet.pumble.com",
+    // "join.gong.io",
+    // "go.chorus.ai",
+    // "doxy.me",
+  ],
+
   // Seconds before the start when the card appears (0-3600).
   "leadSeconds": 60,
 

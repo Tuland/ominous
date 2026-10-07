@@ -48,9 +48,11 @@ describe("the card's input rules", () => {
     assert.equal(L.isOver(0, now), false)
   })
 
-  test("Join is the default only when there is a link", () => {
-    assert.equal(L.initialSelection("https://meet.google.com/x"), 0)
-    assert.equal(L.initialSelection(""), 1)
+  test("Join is the default only for a trusted link", () => {
+    assert.equal(L.initialSelection("https://meet.google.com/x", true), 0)
+    assert.equal(L.initialSelection("https://evil.example/x", false), 1)
+    assert.equal(L.initialSelection("", false), 1)
+    assert.equal(L.initialSelection("", true), 1)
   })
 
   test("arrows and Tab flip the buttons, but there is nothing to flip without a link", () => {

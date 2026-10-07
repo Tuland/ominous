@@ -21,6 +21,50 @@
       "default": false,
       "description": "true = alert only for meetings with an https join link."
     },
+    "joinHosts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+\\.?$"
+      },
+      "default": [
+        "meet.google.com",
+        "zoom.us",
+        "zoom.com",
+        "zoomgov.com",
+        "teams.microsoft.com",
+        "teams.live.com",
+        "teams.microsoft.us",
+        "teams.cloud.microsoft",
+        "webex.com",
+        "meet.jit.si",
+        "whereby.com",
+        "gotomeeting.com",
+        "meet.goto.com",
+        "ringcentral.com",
+        "8x8.vc",
+        "meet.proton.me",
+        "facetime.apple.com"
+      ],
+      "description": "Meeting hosts you trust (subdomains too); your list replaces this one. Other links open with Dismiss selected.",
+      "examples": [
+        "vc.larksuite.com",
+        "vc.feishu.cn",
+        "voovmeeting.com",
+        "cliq.zoho.eu",
+        "meeting.zoho.com",
+        "call.lifesizecloud.com",
+        "app.livestorm.com",
+        "event.demio.com",
+        "streamyard.com",
+        "riverside.fm",
+        "tuple.app",
+        "meet.pumble.com",
+        "join.gong.io",
+        "go.chorus.ai",
+        "doxy.me"
+      ]
+    },
     "leadSeconds": {
       "type": "integer",
       "minimum": 0,

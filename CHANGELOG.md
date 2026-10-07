@@ -7,6 +7,12 @@ All notable changes to Ominous are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- `joinHosts` in `ominous.json`: the meeting hosts you trust (subdomains included). The default
+  holds 17 hosts of the main services, FaceTime included; your list replaces it, and other
+  meeting hosts sit commented out in `omarchy-shell ominous config` and in the example file,
+  ready to enable.
+- A "?" with a tooltip next to Join when the link's host is not trusted, shown while Join is
+  selected and on hover or click.
 - `ominous.json` may hold `//` comments, a comma after the last item and a leading byte order
   mark, so an option can sit commented out until you want it.
 - Keys in `ominous.json` that Ominous does not use are named in `omarchy-shell ominous status`
@@ -17,6 +23,14 @@ All notable changes to Ominous are listed here. The format follows
   prints; Ominous still never writes `ominous.json`.
 - `docs/ominous.example.jsonc` (every key at its default) and `docs/ominous.schema.json`, a JSON
   Schema that lets editors complete the keys and flag a wrong value.
+
+### Changed
+- **A link to a host that is not in `joinHosts` opens with Dismiss selected**, so `Enter` no
+  longer opens it; choose Join on purpose. If you use a service outside the default, add its
+  host to `joinHosts`.
+- The Join button shows the host the browser really opens ("Join on evil.example"), not
+  "Join on browser". A link such as `https://meet.google.com@evil.example/` is read as
+  `evil.example`.
 
 ### Security
 - The calendar name on the card's top line is shown as plain text. Before, a name that looked
