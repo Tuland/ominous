@@ -10,4 +10,3 @@
 ## 2. Release
 
 - [x] 2.1 `CHANGELOG.md`: a Security entry under `Unreleased`. Verify the changelog test passes
-- [ ] 2.2 After the push: CI green. The release itself (0.2.1) follows the `ominous-release` skill once this change is archived
