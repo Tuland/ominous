@@ -28,6 +28,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
 | `tools/make-config-docs.mjs` | Writes `docs/ominous.example.jsonc` and `docs/ominous.schema.json` from the config declaration in `Logic.js` (`--check` only compares); a unit test fails when they are stale. |
+| `.githooks/pre-push` | The pre-push hook: runs the unit checks before every push except a deletion. |
 | `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts, `tsc` on the JSDoc types of `Logic.js`, `mypy` on the Python. |
 | `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
@@ -58,6 +59,11 @@ missing one fails with a hint to run `mise install`.
 Every `tests/run.sh` adds a line to `tests/results.log` (not committed): date, commit, results
 and what failed. On GitHub, `.github/workflows/tests.yml` runs `tests/run.sh --unit` on every
 push and pull request; the live checks need a running shell and stay local.
+
+A `pre-push` hook runs `tests/run.sh --unit` (through `mise exec` when mise is installed) and
+blocks a push that fails it. Git does not enable hooks by itself: run
+`git config core.hooksPath .githooks` once in each checkout. `git push --no-verify` skips it on
+purpose.
 
 The live checks use your real session: the card shows up and grabs the keyboard several times.
 They restore the state files and any user theme they touch, and check that `ominous.json` is
@@ -105,6 +111,57 @@ the code are for a why that the code cannot show.
 - **Python**: Google style docstrings (`Args:`, `Returns:`) on the module and every function,
   and type hints everywhere, checked by `mypy --strict`.
 
+## Security
+
+The plugin shows and acts on data it does not control: the calendar's owner can write a
+meeting's title, place, calendar name and link. Reviews look at that path at three levels:
+
+| When | What | Where it is triggered |
+|---|---|---|
+| Every push | Unit tests, lint, art check | `.githooks/pre-push`, and the CI |
+| End of every change | Code review and security review of the change's diff, against its proposal and specs and the map below | The last task group, "Review", required by `rules.tasks` in `openspec/config.yaml` |
+| Before every release | Audit of the whole code, not the diff, and an update of the map | The "Audit" step of the `ominous-release` skill; a finding stops the release |
+
+### The map: untrusted data to its uses
+
+| Source | Used for | Rule | Held by |
+|---|---|---|---|
+| OmaCal agenda: title, place, calendar name, link | Text on the card | Every `Text` is `Text.PlainText` (rich text can load remote images) | `tests/style.test.mjs` |
+| OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, no spaces or `\`) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened (`Logic.linkHost`, `Logic.joinTarget`) | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
+| OmaCal agenda: title and link | The journal and `status` | Only the event id is logged; `status` never prints a title | `tests/live.sh` |
+| IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again, `joinHosts` included | `tests/payload.test.mjs` |
+| `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.normalizeConfig`, `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
+| User theme files | Colors and text of a sprite | `Logic.normalizeTheme`: colors only, sizes capped | `tests/themes.test.mjs` |
+| Long text from a calendar | The card's size | Elided or capped (title lines, captions, sprite size) | `tests/live.sh` (long title) |
+
+The IPC is reachable only by the same user, who already has full access, so it is not a trust
+boundary; its payload is still checked, so a hand-made one behaves like a real alert.
+
+### APIs not allowed
+
+None of these is in the plugin, and `tests/style.test.mjs` fails when one appears in a `.qml` or
+`Logic.js` file, because each runs or loads something from a string:
+
+- `eval(`
+- `createQmlObject`
+- `openUrlExternally`
+- `Loader`
+- `Image`
+- `AnimatedImage`
+- `XMLHttpRequest`
+
+To use one, argue it in this section first (what data reaches it and why that is safe), and
+change the list here and in the test in the same change.
+
+### Auditing before a release
+
+Walk the map over the whole code, not the diff. For every place where calendar, IPC, config,
+state or theme data enters (`Service.qml`, `Alert.qml`, `Logic.js`), follow it to every use:
+a `Text`, a process or `execDetached`, a file path, a log line, `status`. A use not in the map
+is a finding, and so is a line in the map that no longer holds. Check that the browser is
+started with an argument list and that nothing built from the data reaches a shell. Run the
+tests that hold each rule, then update the map. A finding that is not fixed stops the release.
+
 ## Drawing the shipped characters
 
 `marine`, `shiba` and `boss` are drawn in `tools/draw-themes.py`. Change the art there and
@@ -125,13 +182,20 @@ the `ominous-release` skill, which also proposes the version from what changed.
 1. Every user-visible change is listed under `Unreleased` in [CHANGELOG.md](../CHANGELOG.md)
    (Keep a Changelog). Choose the version with SemVer: fix = patch, addition = minor, a break
    = major (a minor while in 0.x).
-2. Rename `Unreleased` to the version and date, set the same `version` in `manifest.json`
+2. Audit the whole code as "Auditing before a release" above describes; a finding stops the
+   release. Check that every new `ominous.json` key is in the changelog.
+3. Rename `Unreleased` to the version and date, set the same `version` in `manifest.json`
    (`tests/packaging.test.mjs` fails if they differ), and run `tests/run.sh --restart`. If
    the card looks different, also run `tests/theme-check.sh <dir>` and `tools/make-preview.sh`,
    and look at `preview.png` before committing it.
-3. Commit `Release X.Y.Z`, tag it `vX.Y.Z` (annotated), push the branch and the tag, check that
+4. Commit `Release X.Y.Z`, tag it `vX.Y.Z` (annotated), push the branch and the tag, check that
    the GitHub workflow is green, and publish a GitHub release with the changelog section.
-4. The first time only, with the repository public, submit it through the marketplace's
+5. Tell the marketplace. While the submission is still in review, edit its issue so the bots
+   validate the new commit, and answer the maintainer with what changed. Once the plugin is
+   listed, use the marketplace's "Plugin verification" form, "Verify and publish a newer
+   upstream commit", with the release commit; until it is approved the site shows the new
+   version as unverified.
+6. The first time only, with the repository public, submit it through the marketplace's
    [plugin submission form](https://github.com/omacom/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml):
    category **Productivity**, tags **quickshell** and **hyprland**. The marketplace reads the
    name, description, version and license from `manifest.json`, and the picture from

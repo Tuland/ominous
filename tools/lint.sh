@@ -47,7 +47,7 @@ lint_qml() {
 }
 
 #######################################
-# Runs shellcheck on every script in tests/ and tools/.
+# Runs shellcheck on every script in tests/, tools/ and .githooks/.
 # Outputs:
 #   The findings of shellcheck.
 # Returns:
@@ -58,7 +58,7 @@ lint_shell() {
     echo "shellcheck: FAILED (not installed; run mise install)"
     return 1
   fi
-  if shellcheck tests/*.sh tools/*.sh; then echo "shellcheck: clean"; return 0; fi
+  if shellcheck tests/*.sh tools/*.sh .githooks/*; then echo "shellcheck: clean"; return 0; fi
   echo "shellcheck: FAILED"
   return 1
 }

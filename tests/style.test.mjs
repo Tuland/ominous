@@ -74,7 +74,7 @@ describe("QML", () => {
 })
 
 describe("scripts", () => {
-  for (const file of [...list("tests", ".sh"), ...list("tools", ".sh")]) {
+  for (const file of [...list("tests", ".sh"), ...list("tools", ".sh"), ...list(".githooks", "")]) {
     const text = read(file)
     const lines = text.split("\n")
 
@@ -106,4 +106,28 @@ describe("Python", () => {
       })
     })
   }
+})
+
+describe("APIs that run or load from a string", () => {
+  // Argued in docs/development.md, "Security", which lists the same names.
+  const forbidden = ["eval(", "createQmlObject", "openUrlExternally", "Loader", "Image", "AnimatedImage", "XMLHttpRequest"]
+  const files = ["Logic.js", ...list(".", ".qml"), ...list("components", ".qml")].map((f) => f.replace(/^\.\//, ""))
+  // Only code counts: a comment may name an API to say it is not used.
+  const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+  for (const file of files)
+    test(file + " uses none of them", () => {
+      const text = code(read(file))
+      for (const api of forbidden) {
+        const re = new RegExp(api.endsWith("(") ? api.replace("(", "\\(") : "\\b" + api + "\\b")
+        assert.doesNotMatch(text, re, file + " uses " + api + "; argue it in docs/development.md, \"Security\", first")
+      }
+    })
+
+  test("docs/development.md lists exactly these APIs", () => {
+    const md = read("docs/development.md")
+    const section = md.split("### APIs not allowed")[1].split("\n#")[0]
+    const listed = [...section.matchAll(/^- `([^`]+)`$/gm)].map((m) => m[1])
+    assert.deepEqual(listed, forbidden)
+  })
 })

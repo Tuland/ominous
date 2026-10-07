@@ -14,6 +14,16 @@ context: |
   agent skills set skip_specs: true. User-visible changes go under Unreleased in CHANGELOG.md.
   Everything in English. No personal or employer data in code, docs, tests or examples.
 
+rules:
+  tasks:
+    - >-
+      The last group of every change is "Review", the last task of the change: a code review
+      and a security review of the change's own diff, read against its proposal, specs and
+      design and against the "Security" section of docs/development.md (untrusted input,
+      sinks, APIs not allowed). Fix what they find inside the change; a finding that needs
+      a decision goes to the user. The change is done only when the Review group is ticked,
+      and it is committed after it.
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.

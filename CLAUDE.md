@@ -54,6 +54,11 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   Python hints. `tests/style.test.mjs` checks the comments, `tools/lint.sh` (`qmllint`,
   `shellcheck`, `tsc`, `mypy`) the rest.
 - Commits and pushes wait for the user to ask.
+- Reviews at three levels (`docs/development.md`, "Security"): the `pre-push` hook runs the unit
+  checks (enable with `git config core.hooksPath .githooks`); the last task group of every change
+  is "Review" (code and security review of its diff, required by `openspec/config.yaml`); the
+  `ominous-release` skill audits the whole code before a release. APIs that run or load from a
+  string (`eval`, `Loader`, `Image`...) are not allowed; `tests/style.test.mjs` enforces it.
 
 ## Checking a change
 
