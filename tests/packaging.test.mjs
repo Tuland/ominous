@@ -108,3 +108,13 @@ describe(".gitignore", () => {
     assert.equal(hidden, "", ".gitignore matches tracked files:\n" + hidden)
   })
 })
+
+describe("symlinks", () => {
+  test("git tracks none: the marketplace refuses a plugin folder that holds one", () => {
+    // `git ls-files -s -z` prints "<mode> <object> <stage>\t<path>\0", paths unquoted; a link
+    // has mode 120000.
+    const links = execFileSync("git", ["ls-files", "-s", "-z"], { cwd: new URL("..", import.meta.url), encoding: "utf8" })
+      .split("\0").filter((l) => l.startsWith("120000 ")).map((l) => l.split("\t")[1])
+    assert.deepEqual(links, [], "symlinks tracked by git:\n" + links.join("\n"))
+  })
+})

@@ -33,6 +33,7 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
 | `.claude/skills/ominous-theme/` | The agent skill for drawing and reviewing characters. |
+| `.agents/skills/` | The OpenSpec skills. `openspec update` links them into `.claude/skills/openspec-*`; git ignores the links, because the marketplace refuses a plugin folder that holds a symlink (a unit test checks that git tracks none). |
 | `tests/` | Unit tests by concern (`*.test.mjs`), live checks against the running shell, and `run.sh`. |
 | `openspec/` | Specs and changes. |
 

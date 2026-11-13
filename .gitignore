@@ -4,6 +4,15 @@
 
 # ---- This repository
 tests/results.log
+# Links `openspec update` makes to .agents/skills/: the marketplace refuses a plugin folder
+# holding a symlink (tests/packaging.test.mjs checks that git tracks none). Named one by one,
+# so a real folder with the same prefix is never hidden, and a new link fails the test.
+/.claude/skills/openspec-apply-change
+/.claude/skills/openspec-archive-change
+/.claude/skills/openspec-explore
+/.claude/skills/openspec-propose
+/.claude/skills/openspec-sync-specs
+/.claude/skills/openspec-update-change
 
 # ---- Operating systems
 # Linux
