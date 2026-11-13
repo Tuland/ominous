@@ -19,7 +19,8 @@ A theme SHALL also be able to enable the progress bar. Themes SHALL be looked up
 `~/.config/omarchy/ominous/themes/` and then among the themes shipped with the plugin, so a
 user theme with the same name overrides a built-in one. A missing phase color SHALL fall back
 to the default for that phase: accent for relaxed, a blend of accent and urgent for tense,
-urgent for angry.
+urgent for angry. When the user themes folder does not exist, the service SHALL create it at
+start and SHALL watch it from then on, without a restart.
 
 #### Scenario: User theme overrides a built-in one
 - **WHEN** `~/.config/omarchy/ominous/themes/marine.json` exists
@@ -28,6 +29,12 @@ urgent for angry.
 #### Scenario: Missing phase color
 - **WHEN** a theme defines no color for the tense phase
 - **THEN** the tense phase uses the default tense color
+
+#### Scenario: First start without the themes folder
+- **WHEN** the shell starts with no `~/.config/omarchy/ominous/themes/` folder, and the user
+  later saves `marine.json` there
+- **THEN** the folder exists after start, no error is logged, and the playful mode with theme
+  `marine` uses the user's file without a restart
 
 ### Requirement: Broken themes never break the alert
 A theme that cannot be found, cannot be read or is not valid JSON SHALL be replaced by the

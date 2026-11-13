@@ -30,6 +30,9 @@ Item {
   // The overlay writes the mode here when the card's switch is toggled; this
   // side only reads it, so there is exactly one writer.
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/ominous"
+  // True once mkdir has run for the state and user themes folders: the files inside them take their paths
+  // from it, so each one loads and is watched as soon as it can be, with no reload call.
+  property bool dirsReady: false
 
   property var config: Logic.normalizeConfig(null)
   // What the last read of ominous.json found wrong: keys Ominous does not use, values it refused,
@@ -82,7 +85,7 @@ Item {
    */
   function withLook(p: var): var {
     var look = Logic.look(root.config, root.mode, { professional: professionalTheme.theme, playful: playfulTheme.theme })
-    for (var k in look) p[k] = look[k]
+    for (const k in look) p[k] = look[k]
     return p
   }
 
@@ -135,21 +138,20 @@ Item {
   }
 
   // A file can only be watched once its directory exists, so create the state
-  // and the user themes directories up front and load their files after.
+  // and the user themes directories up front; the files follow `dirsReady`.
   Process {
     command: ["mkdir", "-p", root.stateDir, root.userThemesDir]
     running: true
-    onExited: {
-      stateFile.reload()
-      themesFile.reload()
-      professionalTheme.reloadUserFile()
-      playfulTheme.reloadUserFile()
+    // Set on failure too: the files then report themselves missing, and the service still runs.
+    onExited: function(exitCode) {
+      if (exitCode !== 0) root.log("could not create " + root.stateDir + " or " + root.userThemesDir)
+      root.dirsReady = true
     }
   }
 
   FileView {
     id: stateFile
-    path: root.stateDir + "/state.json"
+    path: root.dirsReady ? root.stateDir + "/state.json" : ""
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -159,7 +161,7 @@ Item {
 
   FileView {
     id: themesFile
-    path: root.stateDir + "/themes.json"
+    path: root.dirsReady ? root.stateDir + "/themes.json" : ""
     watchChanges: true
     atomicWrites: true
     printErrors: false
@@ -172,7 +174,7 @@ Item {
   // Both theme folders, kept current by the models themselves, for `themes` and `theme`.
   FolderListModel {
     id: userThemeFiles
-    folder: "file://" + encodeURI(root.userThemesDir)
+    folder: root.dirsReady ? "file://" + encodeURI(root.userThemesDir) : ""
     nameFilters: ["*.json"]
     showDirs: false
   }
@@ -192,7 +194,7 @@ Item {
    */
   function fileNames(model: var): var {
     var out = []
-    for (var i = 0; i < model.count; i++) out.push(model.get(i, "fileName"))
+    for (let i = 0; i < model.count; i++) out.push(model.get(i, "fileName"))
     return out
   }
 
@@ -203,7 +205,7 @@ Item {
     id: professionalTheme
     mode: "professional"
     name: root.themeNames.professional
-    userDir: root.userThemesDir
+    userDir: root.dirsReady ? root.userThemesDir : ""
     shippedDir: root.shippedThemesDir
   }
 
@@ -211,7 +213,7 @@ Item {
     id: playfulTheme
     mode: "playful"
     name: root.themeNames.playful
-    userDir: root.userThemesDir
+    userDir: root.dirsReady ? root.userThemesDir : ""
     shippedDir: root.shippedThemesDir
   }
 
@@ -228,7 +230,7 @@ Item {
         return
       }
       try {
-        var parsed = JSON.parse(agendaOut.text)
+        const parsed = JSON.parse(agendaOut.text)
         root.events = Array.isArray(parsed.data) ? parsed.data : []
         root.lastError = ""
         root.lastFetchMs = Date.now()
@@ -283,7 +285,7 @@ Item {
       var r = Logic.previewPayload(spec, Date.now())
       if (r.error) return r.error
       var p = root.withLook(r.payload)
-      for (var k in r.overrides) p[k] = r.overrides[k]
+      for (const k in r.overrides) p[k] = r.overrides[k]
       return root.summon(p) ? "ok" : "failed"
     }
 
@@ -300,6 +302,8 @@ Item {
      * @param spec "<name> [mode]" or "reset [mode]".
      */
     function theme(spec: string): string {
+      // The state file has no path yet, so a write now would be lost.
+      if (!root.dirsReady) return "not ready yet, try again"
       var names = root.themeCatalog().map(function(t) { return t.name })
       var r = Logic.themeCommand(spec, Logic.parseThemeOverrides(root.themesStateText), names, root.mode)
       if (r.error) return r.error

@@ -6,6 +6,12 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Omarchy 4.5: a `TypeError` in the shell log on start (`reloadUserFile ... is not a function`),
+  after which the user themes folder was not watched until a restart. The theme and state files
+  now load as soon as their folders exist, and a theme saved in a folder Ominous has just created
+  is picked up, and listed by `themes`, without a restart.
+
 ## [0.3.0] - 2026-10-08
 
 ### Added

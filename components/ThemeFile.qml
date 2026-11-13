@@ -16,9 +16,6 @@ Item {
   property string status: "loading"
   property var theme: null
 
-  /** Reads the file again, e.g. after its folder was created. */
-  function reload(): void { fileView.reload() }
-
   FileView {
     id: fileView
     path: tf.path
