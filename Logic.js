@@ -752,7 +752,8 @@ function nextDue(events, nowMs, cfg, fired) {
   var best = null
   for (var i = 0; i < (events || []).length; i++) {
     var ev = events[i]
-    if (fired[eventKey(ev)] || !isDueNow(ev, nowMs, cfg)) continue
+    // Alertability first: it refuses an entry that is not an object, before eventKey reads it.
+    if (!isDueNow(ev, nowMs, cfg) || fired[eventKey(ev)]) continue
     var start = Number(ev.startMs), bestStart = best ? Number(best.startMs) : 0
     if (!best || start < bestStart || (start === bestStart && isConfirmed(ev) && !isConfirmed(best))) best = ev
   }
@@ -793,9 +794,10 @@ function claimDue(events, nowMs, cfg, fired) {
   var start = Number(ev.startMs)
   fired[eventKey(ev)] = start
   for (var i = 0; i < events.length; i++) {
-    var other = events[i], s = Number(other.startMs)
-    if (isAlertable(other, cfg) && !isConfirmed(other) && s >= start && s < start + GROUP_SECONDS * 1000)
-      fired[eventKey(other)] = s
+    var other = events[i]
+    if (!isAlertable(other, cfg) || isConfirmed(other)) continue
+    var s = Number(other.startMs)
+    if (s >= start && s < start + GROUP_SECONDS * 1000) fired[eventKey(other)] = s
   }
   return ev
 }

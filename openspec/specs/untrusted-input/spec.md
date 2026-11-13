@@ -187,3 +187,11 @@ ignored SHALL be decided at the moment of the key or click, not from an earlier 
 #### Scenario: A key after a pause
 - **WHEN** the user stops typing for a second and then presses Space
 - **THEN** the selected button is activated
+
+### Requirement: A malformed agenda entry is skipped
+An entry of OmaCal's agenda that is not an object SHALL be skipped when choosing the next
+alert; the other entries SHALL still alert as usual.
+
+#### Scenario: A null entry in the agenda
+- **WHEN** the agenda holds `null` and a meeting due now
+- **THEN** the card opens for the meeting, once

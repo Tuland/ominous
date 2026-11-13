@@ -25,7 +25,7 @@ Item {
   // While nothing has loaded yet, plain defaults rather than nothing.
   readonly property var theme: slot.picked.theme || Logic.normalizeTheme({})
 
-  // Empty until the service has created the user's folder, so the file is watched from the start.
+  // Empty until the service has tried to create the user's folder, so the file is watched from the start.
   ThemeFile { id: userFile; path: slot.userDir ? slot.userDir + "/" + slot.name + ".json" : "" }
   ThemeFile { id: shippedFile; path: slot.shippedDir + "/" + slot.name + ".json" }
   ThemeFile { id: defaultFile; path: slot.shippedDir + "/" + slot.fallbackName + ".json" }

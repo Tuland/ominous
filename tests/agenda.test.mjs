@@ -117,6 +117,13 @@ describe("alerting once", () => {
 })
 
 describe("status", () => {
+  test("an entry that is not an object is skipped, the others still alert", () => {
+    const fired = {}
+    const events = [null, 7, "x", ev({ eventId: 1, startMs: now + 30_000 })]
+    assert.equal(L.claimDue(events, now, cfg, fired)?.eventId, 1)
+    assert.equal(L.claimDue(events, now + 5_000, cfg, fired), null)
+  })
+
   test("counts and the next start, never a title", () => {
     const events = [ev({ eventId: 1, title: "TOP SECRET plan", startMs: now + 50_000 }),
                     ev({ eventId: 2, title: "Another secret", startMs: now + 20_000 }),

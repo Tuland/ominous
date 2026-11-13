@@ -30,8 +30,9 @@ Item {
   // The overlay writes the mode here when the card's switch is toggled; this
   // side only reads it, so there is exactly one writer.
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/ominous"
-  // True once mkdir has run for the state and user themes folders: the files inside them take their paths
-  // from it, so each one loads and is watched as soon as it can be, with no reload call.
+  // True once mkdir has run for the state and user themes folders (if it failed, the files
+  // report themselves missing): the files inside them take their paths from it, so each one
+  // loads and is watched as soon as it can be, with no reload call.
   property bool dirsReady: false
 
   property var config: Logic.normalizeConfig(null)
@@ -302,8 +303,11 @@ Item {
      * @param spec "<name> [mode]" or "reset [mode]".
      */
     function theme(spec: string): string {
-      // The state file has no path yet, so a write now would be lost.
-      if (!root.dirsReady) return "not ready yet, try again"
+      // Before the folders are ready the state file has no path, so a write would be lost, and
+      // the theme folders may not be listed yet, so a theme would be "not found". A folder that
+      // does not exist ends Ready too, so this never waits forever.
+      if (!root.dirsReady || userThemeFiles.status === FolderListModel.Loading
+          || shippedThemeFiles.status === FolderListModel.Loading) return "not ready yet, try again"
       var names = root.themeCatalog().map(function(t) { return t.name })
       var r = Logic.themeCommand(spec, Logic.parseThemeOverrides(root.themesStateText), names, root.mode)
       if (r.error) return r.error

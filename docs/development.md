@@ -131,7 +131,7 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 |---|---|---|---|
 | OmaCal agenda: title, place, calendar name, link | Text on the card | Every `Text`, `Label`, `TextEdit` and `TextArea` is `Text.PlainText` (rich text can load remote images); title, place and calendar name are one cleaned line of bounded length (`Logic.cleanText`), so line breaks and direction overrides cannot reshape or reorder the card | `tests/style.test.mjs`, `tests/payload.test.mjs` |
 | OmaCal agenda: link | Opening the browser | `Logic.safeUrl` (`https://` only, at most 2048 characters, with a host, no spaces, `\`, control characters; no `$` or `--private` anywhere, no `%` in the host) and an argument list, never a shell; Join is the default only for a host in `joinHosts`, and the host shown is the one opened, with every character outside printable ASCII escaped and the length capped (`Logic.linkHost`, `Logic.displayHost`, `Logic.joinTarget`); "recognized" means the service, not the meeting | `tests/hosts.test.mjs`, `tests/agenda.test.mjs` |
-| OmaCal agenda: title and link | The journal and `status` | Only the event id is logged, quoted (`Logic.quoted`); `status` never prints a title | `tests/style.test.mjs` (log lines, a check of each line, not of the data flow), `tests/live.sh` (`status`) |
+| OmaCal agenda: title and link | The journal and `status` | Only the event id is logged, quoted (`Logic.quoted`); `status` never prints a title | `tests/style.test.mjs` (log lines, a check of each line, not of the data flow), `tests/agenda.test.mjs` (`status` of an agenda with titles) |
 | OmaCal agenda: number of events | The card taking the screen and the keyboard | One card per group: when an alert fires, every unconfirmed event (not accepted, not organized) starting within the next minute counts as alerted (`Logic.claimDue`), so a flood gives at most one card a minute; a confirmed event always gets its own card and wins a tie; a start a `Date` cannot hold is not alertable | `tests/agenda.test.mjs` |
 | Keys while the card opens | Joining or dismissing | Input is ignored for a second after the card opens and after every key pressed while ignored, decided at the moment of the input (`Logic.isGuarded`) | `tests/card.test.mjs`, `tests/style.test.mjs` (every input handler of `Alert.qml` asks `guardedNow()`), `tests/live.sh` (keys) |
 | IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again with the config's ranges (`dim` 0 to 1, seconds 0 to 3600), `joinHosts` included | `tests/payload.test.mjs` |
@@ -139,9 +139,14 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 | User theme files | Colors, caption and sprite | `Logic.normalizeTheme`: colors only (at most 40 characters), captions one cleaned line of 80 characters (`Logic.cleanText`) drawn clipped, sprites at most 32x32 cells and 64 frames per phase | `tests/themes.test.mjs` |
 | Long text from a calendar | The card's size | Elided or capped (title lines, captions, sprite size) | `tests/live.sh` (long title) |
 
-The browser is started by `omarchy-launch-browser`, which runs
-`systemd-run … uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"`. Each layer was read
-for what it could make of a link:
+The browser is started by `omarchy-launch-browser`. Since Omarchy 4.5 it first tries
+`omarchy-cmd-browser-handoff "$browser_exec" "${@/--private/$private_flag}"`, which hands the
+arguments, NUL-separated, to one of the Chromium builds it lists when already running; only when that fails
+does it run `systemd-run … uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"`. Each
+layer was read for what it could make of a link:
+
+- The handoff separates arguments with NUL; `Logic.safeUrl` refuses control characters, NUL
+  included, so a link stays one argument.
 
 - `systemd-run` expands `${VAR}` in the arguments, so a `$` could change the host the browser
   opens; `uwsm-app` starts the browser through a second `systemd-run`, with the same expansion.

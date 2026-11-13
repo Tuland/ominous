@@ -11,6 +11,9 @@ All notable changes to Ominous are listed here. The format follows
   after which the user themes folder was not watched until a restart. The theme and state files
   now load as soon as their folders exist, and a theme saved in a folder Ominous has just created
   is picked up, and listed by `themes`, without a restart.
+- A `null` entry in the agenda no longer stops every alert; it is skipped.
+- `theme` answers "not ready yet, try again" in the moment after the shell starts, before the
+  theme folders are read, instead of losing the choice or calling a theme not found.
 
 ## [0.3.0] - 2026-10-08
 
