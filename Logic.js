@@ -892,9 +892,9 @@ function utf8Over(text, max) {
 
 /**
  * What an agenda refresh yields, from the command's output and exit code. The size is checked
- * first: a cut output makes the command exit with 141. A UTF-8 sequence cut by the limit is
- * read as U+FFFD, three bytes, so a cut output always counts as over the limit. On any error the
- * previous events stay in use.
+ * first: a cut output usually makes the command exit with 141 (SIGPIPE), but not everywhere. A
+ * UTF-8 sequence cut by the limit is read as U+FFFD, three bytes, so a cut output always counts
+ * as over the limit. On any error the previous events stay in use.
  *
  * @param {AgendaEvent[]} previous The events in use before this refresh.
  * @param {string} text What the command printed.

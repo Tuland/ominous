@@ -265,10 +265,12 @@ describe("agenda command", () => {
     assert.doesNotMatch(service, /"omacal"/)
   })
 
-  test("2 MiB from OmaCal: the shell gets 1 MiB + 1 byte and exit 141", () => {
+  test("2 MiB from OmaCal: the shell gets 1 MiB + 1 byte, read as too large whatever the exit", () => {
     const r = run(["omacal", "head", "cat"], "head -c 2097152 /dev/zero")
     assert.equal(r.bytes, 1048577)
-    assert.equal(r.code, 141)
+    // Usually 141 (OmaCal killed by SIGPIPE); where SIGPIPE is handled otherwise, as on the CI
+    // runner, it can be 0. The size decides either way.
+    assert.equal(L.readAgenda([], "x".repeat(r.bytes), r.code).error, "agenda too large")
   })
 
   test("exactly 1 MiB: all of it, exit 0", () => {
