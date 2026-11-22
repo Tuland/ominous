@@ -63,7 +63,10 @@ diff each; this one sees the release.
 1. **Code review** of `git diff <last tag>..HEAD`, against the archived changes of the release
    and their specs: logic, edge cases, wrong comments, docs and lists that fell behind. Give the
    range explicitly: `/code-review` without a target reviews only the current changes, which
-   right after an archive are none.
+   right after an archive are none. First list the reviews done since the tag (the archived
+   changes' Review tasks say who read what). When a separate reviewer already read the whole
+   range, or every change of the release, and only small fixes verified by the checks came
+   after, skip it: tell the user what was covered, and have a reviewer read only what none saw.
 2. **Security audit**, as `docs/development.md` describes under "Security", over the whole code
    and not the diff, by a separate reviewer agent given the map and the threat model:
    `/security-review` covers only the pending changes, so it is not this audit. Follow the data
