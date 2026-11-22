@@ -10,6 +10,18 @@ focused monitor over a dimmed screen, and goes through three phases, each with i
 - **angry** once the meeting has started: red, and it stays until you dismiss it or the meeting
   ends.
 
+While the card is open, it follows your calendar (read once a minute):
+
+- If the title, end, place, calendar or link changes, the card shows the new values and a line
+  such as "Changed in your calendar: link". The usual rule picks the selected button for the
+  new link, and input is ignored again for a second.
+- If the meeting is removed, declined or moved to another time, the card keeps what it showed,
+  hides Join, and says so ("Removed from your calendar", "Declined in your calendar",
+  "Moved to 15:00") with a countdown: it closes after 15 seconds (or when the meeting ends, if
+  sooner), or at once with `Esc` or Dismiss. A moved meeting alerts again before its new start, if that start is still ahead.
+  While the countdown runs, a new alert waits for it to end (or for you to close the card).
+- A card you dismissed does not come back for a change.
+
 Which meetings alert:
 
 - Only calendars listed in `calendars` (all of them when the list is empty); see
@@ -50,10 +62,15 @@ omarchy-shell ominous status                   # JSON: config, mode, themes, cou
 omarchy-shell ominous config                   # your complete config with comments, defaults filled in; writes nothing; see configuration.md
 omarchy-shell ominous themes                   # the themes and which mode uses each; see themes.md
 omarchy-shell ominous theme shiba              # choose a theme; see themes.md
+omarchy-shell ominous hold 30                  # hold real alerts for 30 s (at most 60), for screenshots; hold 0 ends it
 ```
 
 `preview` takes `<relaxed|tense|angry> [professional|playful] [title...]`. Without a mode it uses
 the current one and saves nothing; a long title is a quick way to check that text fits.
+
+`hold` is for development: while it lasts no alert opens and an open card is not updated, and
+it ends by itself (a shell restart ends it too). A meeting due meanwhile alerts right after,
+if its alert window is still open. `status` shows the seconds left as `holdSeconds`.
 
 `status` never prints meeting titles.
 

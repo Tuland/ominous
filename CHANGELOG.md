@@ -6,6 +6,26 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `omarchy-shell ominous hold <seconds>`: holds real alerts for up to 60 seconds, for
+  screenshots; it ends by itself, and `hold 0` ends it at once. A meeting due meanwhile alerts
+  right after, if its alert window is still open. `status` shows `holdSeconds`.
+
+### Changed
+- A card on screen follows your calendar. When the title, end, place, calendar or link changes,
+  the card shows the new values and "Changed in your calendar: …"; Join opens the new link,
+  never the old one. When the meeting is removed, declined or moved, the card says so, hides
+  Join and closes after a 15-second countdown, or at the meeting's end if sooner (`Esc` or
+  Dismiss close it at once), and new alerts wait for the countdown; a moved meeting alerts
+  again before its new start, if that start is still ahead. A card you dismissed does not come
+  back.
+
+### Security
+- The agenda refresh accepts at most 1 MiB of OmaCal's output (it reads one byte more, to tell).
+  A larger output is refused
+  (`status` shows "agenda too large" in `lastError`) and the meetings read before keep
+  alerting, so a calendar flooded by an outside publisher cannot make the shell hold all of it.
+
 ## [0.3.1] - 2026-11-13
 
 ### Fixed

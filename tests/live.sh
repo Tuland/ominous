@@ -55,26 +55,81 @@ overlay_open() {
 # Whether the card's layer is gone.
 overlay_closed() { ! overlay_open; }
 
-BK=$(mktemp -d)
-[[ -f $STATE ]] && cp -p "$STATE" "$BK/state.json"
-[[ -f $THEME_CHOICE ]] && cp -p "$THEME_CHOICE" "$BK/themes.json"
-[[ -f $THEMES/marine.json ]] && cp -p "$THEMES/marine.json" "$BK/marine.json"
+# The user files the checks change, and their names inside the backup folder.
+USER_FILES=("$STATE" "$THEME_CHOICE" "$THEMES/marine.json")
+BACKUP_NAMES=(state.json themes.json marine.json)
+BK=$(mktemp -d) || exit 1
 #######################################
-# Puts the user's state files and theme back as they were, and closes the card.
+# Copies one user file into the backup folder, if it exists. A failed copy, or a symlink
+# (the checks would write through it into its target), stops the run before anything is
+# changed: cleanup() must never run without a usable backup. A file with other hard links stops
+# it too: the checks would write through every name, and only this one is put back.
 # Globals:
-#   STATE, THEME_CHOICE, THEMES, BK
+#   BK
+# Arguments:
+#   The user file.
+#   Its name inside the backup folder.
+# Outputs:
+#   Why the run stopped.
+#######################################
+backup() {
+  [[ -L $1 ]] && { echo "$1 is a symlink: nothing was changed" >&2; rm -rf "$BK"; exit 1; }
+  [[ -f $1 ]] || return 0
+  (($(stat -c %h "$1") == 1)) || { echo "$1 has other hard links: nothing was changed" >&2; rm -rf "$BK"; exit 1; }
+  cp -p "$1" "$BK/$2" && return 0
+  echo "cannot back up $1: nothing was changed" >&2
+  rm -rf "$BK"
+  exit 1
+}
+for i in "${!USER_FILES[@]}"; do backup "${USER_FILES[i]}" "${BACKUP_NAMES[i]}"; done
+#######################################
+# Puts the user's state files and theme back as they were, closes the card and ends any hold. A backed-up
+# file is copied to a new temporary file beside its place and renamed over it (`mv -T`), so a symlink put there during
+# the run is replaced, never written through; a file that had no backup is removed. When a
+# file cannot be put back or removed, the backup folder is kept and its path printed, so
+# nothing is lost, and the run exits with an error.
+# Known limits, kept on purpose: the checks write these same files, so at the end this
+# function cannot tell a file the user created or edited during the run from one the checks
+# left. It removes the first and puts the second back to its backup: keeping an unknown file
+# could leave a check's marine.json that hides the shipped theme. And a symlink put at one of
+# these paths after the backup is followed by the checks' own writes (plain redirections), so
+# its target keeps what they wrote. Do not edit these files while the live checks run.
+# Globals:
+#   USER_FILES, BACKUP_NAMES, BK
+# Outputs:
+#   The backup folder's path, when a file could not be put back or removed.
 #######################################
 cleanup() {
   hide
-  rm -f "$THEMES/marine.json" "$STATE" "$THEME_CHOICE"
-  [[ -f $BK/state.json ]] && cp -p "$BK/state.json" "$STATE"
-  [[ -f $BK/themes.json ]] && cp -p "$BK/themes.json" "$THEME_CHOICE"
-  [[ -f $BK/marine.json ]] && cp -p "$BK/marine.json" "$THEMES/marine.json"
+  omarchy-shell -q ominous hold 0 2>/dev/null
+  local i file saved tmp lost=0
+  for i in "${!USER_FILES[@]}"; do
+    file=${USER_FILES[i]} saved=$BK/${BACKUP_NAMES[i]}
+    if [[ -f $saved ]]; then
+      # A new, unique file beside the target (mktemp), so no existing file or link is reused.
+      mkdir -p "${file%/*}" && tmp=$(mktemp "${file%/*}/.restore.XXXXXX") && cp -p "$saved" "$tmp" \
+        && mv -Tf "$tmp" "$file" || lost=1
+    else
+      rm -f "$file" || lost=1
+    fi
+  done
+  ((lost)) && { echo "could not put every file back: the backups are in $BK" >&2; exit 1; }
   rm -rf "$BK"
 }
 trap cleanup EXIT
 
-if ((RESTART)); then omarchy restart shell >/dev/null 2>&1; wait_for 75 status_ok; fi
+# Prints the seconds left in the hold.
+hold_left() { jsonget "d['holdSeconds']"; }
+# Whether the hold has $1 to $2 seconds left.
+hold_between() { local s; s=$(hold_left) && ((s >= $1 && s <= $2)); }
+# A hold set before the restart must be gone right after it (reported below). Skipped when the
+# running plugin is older than `hold`.
+restart_hold="skip"
+if ((RESTART)); then
+  [[ $(omarchy-shell ominous hold 60 2>/dev/null) == ok ]] && hold_between 50 60 && restart_hold="set"
+  omarchy restart shell >/dev/null 2>&1; wait_for 75 status_ok
+  if [[ $restart_hold == set ]]; then hold_between 0 0 && restart_hold="ended" || restart_hold="kept"; fi
+fi
 if ! status_ok; then
   echo "FAIL shell answers on the ominous IPC target (is the shell running and the plugin enabled?)"
   echo "live: 0 passed, 1 failed [shell not reachable]"
@@ -206,6 +261,70 @@ unknown_link_opens() {
 }
 check "a card with an unrecognized link opens and closes" unknown_link_opens
 
+# ---- a note about a calendar change
+# Summons a card with a "removed" note that closes by itself after $1 seconds.
+summon_closing() {
+  local payload
+  payload=$(python3 -c 'import json, sys, time; n = time.time() * 1000; print(json.dumps({"title": "Live check", "startMs": n + 600000, "endMs": n + 1800000, "leadSeconds": 900, "notice": {"kind": "removed", "closeInSeconds": int(sys.argv[1])}}))' "$1")
+  omarchy-shell shell summon "$ID" "$payload" >/dev/null
+}
+closes_after_countdown() {
+  summon_closing 2 && wait_for 15 overlay_open || return 1
+  wait_for 20 overlay_closed
+}
+check "a card with a closing note closes at the end of its countdown" closes_after_countdown
+
+# Prints when the service last read the agenda.
+last_fetch() { jsonget "d['lastFetch']"; }
+# Whether the agenda was read again since FETCH_BEFORE.
+fetched_since() { [[ $(last_fetch) != "$FETCH_BEFORE" ]]; }
+# Opens a card with IPC command $1 (and argument $2), waits for the next agenda refresh (once a
+# minute), and checks the card is still there: the follow-up only touches agenda cards.
+stays_across_refresh() {
+  [[ $(omarchy-shell ominous "$@") == ok ]] && wait_for 15 overlay_open || return 1
+  # Read once the card is up, so the refresh waited for comes after it opened.
+  FETCH_BEFORE=$(last_fetch)
+  wait_for 450 fetched_since || { echo "no agenda refresh within 90 s" >&2; hide; return 1; }
+  sleep 1
+  overlay_open; local open=$?
+  hide; wait_for 15 overlay_closed
+  return $open
+}
+check "a test card stays open across an agenda refresh" stays_across_refresh test
+check "a preview card stays open across an agenda refresh" stays_across_refresh preview "relaxed professional"
+
+# ---- holding real alerts
+case $restart_hold in
+  ended|kept) check "a shell restart ends a hold" test "$restart_hold" = ended ;;
+  *) ((RESTART)) && echo "SKIP a shell restart ends a hold (the plugin before the restart had no hold)" ;;
+esac
+holds_and_ends() {
+  [[ $(omarchy-shell ominous hold 5) == ok ]] && hold_between 1 5 || return 1
+  [[ $(omarchy-shell ominous hold 0) == "hold ended" ]] && hold_between 0 0
+}
+check "hold 5 holds, hold 0 ends it" holds_and_ends
+refuses_bad() {
+  omarchy-shell ominous hold 30 >/dev/null; local a b
+  a=$(omarchy-shell ominous hold 61) b=$(omarchy-shell ominous hold abc)
+  [[ $a == *"0 to 60"* && $b == *"0 to 60"* ]] && hold_between 28 30; local r=$?
+  omarchy-shell ominous hold 0 >/dev/null; return $r
+}
+check "hold refuses 61 and abc and keeps the running hold" refuses_bad
+renews() {
+  omarchy-shell ominous hold 10 >/dev/null; sleep 2; omarchy-shell ominous hold 60 >/dev/null
+  hold_between 58 60; local r=$?
+  omarchy-shell ominous hold 0 >/dev/null; return $r
+}
+check "a new hold replaces the time left" renews
+test_during_hold() {
+  omarchy-shell ominous hold 30 >/dev/null
+  [[ $(omarchy-shell ominous test) == ok ]] && wait_for 15 overlay_open && hold_between 1 30; local r=$?
+  hide; wait_for 15 overlay_closed; omarchy-shell ominous hold 0 >/dev/null; return $r
+}
+check "test opens a card during a hold and the hold stays" test_during_hold
+ends_by_itself() { omarchy-shell ominous hold 2 >/dev/null && sleep 3 && hold_between 0 0; }
+check "a hold ends by itself" ends_by_itself
+
 # ---- keys (opt-in)
 state_mode_is() { [[ $(python3 -c "import json;print(json.load(open('$STATE'))['mode'])" 2>/dev/null) == "$1" ]]; }
 if ((KEYS)); then
@@ -248,6 +367,15 @@ if ((KEYS)); then
       sleep 1; ! pgrep -f 'omarchy-launch-browser.*ominous-live-check' >/dev/null
     }
     check "Enter on an unrecognized link dismisses it and opens nothing" enter_dismisses_unknown_link
+    hide; wait_for 15 overlay_closed
+    # Esc closes a card counting down at once, long before its countdown ends.
+    esc_closes_countdown() {
+      summon_closing 20 && wait_for 15 overlay_open || return 1
+      sleep 1.4   # past the input guard
+      wtype -k Escape
+      wait_for 10 overlay_closed
+    }
+    check "Esc closes a card counting down at once" esc_closes_countdown
     hide
   else
     echo "SKIP key checks: wtype not installed"

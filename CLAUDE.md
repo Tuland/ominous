@@ -76,11 +76,15 @@ omarchy restart shell            # QML changes: an already-summoned overlay keep
 omarchy-shell ominous test       # synthetic alert now
 omarchy-shell ominous preview "angry playful"   # hold one phase/mode; add a long title to test fit
 omarchy-shell shell hide io.github.tuland.ominous         # close it again (the card grabs the keyboard)
-omarchy-shell ominous status     # config, counts, next start, last error
+omarchy-shell ominous status     # config, counts, next start, last error, holdSeconds
+omarchy-shell ominous hold 30    # hold real alerts (at most 60 s, ends by itself); hold 0 ends it
 ```
 
 Live checks and screenshots touch the user's real session: the card grabs the keyboard, so
-never inject keys unless the overlay is open; restore any state file or theme you change. To
+never inject keys unless the overlay is open; restore any state file or theme you change.
+Before holding real alerts, with `hold` or through `tools/shoot-card.sh`, `tools/make-preview.sh`
+or `tests/theme-check.sh`, say so to the user; afterwards check that `status` shows
+`holdSeconds` 0. To
 look at the card, use `tools/shoot-card.sh` (a synthetic card on an opaque veil), never a raw
 screenshot of the screen. For theme and character work, follow the `ominous-theme` skill
 (`.claude/skills/ominous-theme/`).

@@ -10,8 +10,9 @@ import "Logic.js" as Logic
 
 /**
  * The alert overlay: a large card in the middle of the focused monitor, over a dimmed
- * screen. It stays until dismissed or until the meeting ends: a corner toast is exactly what
- * gets missed. The decisions are in Logic.js; this file wires them to the window, the keys
+ * screen. It stays until dismissed or until the meeting ends (or, for a card that says its
+ * meeting was removed, declined or moved, until its countdown runs out): a corner toast is
+ * exactly what gets missed. The decisions are in Logic.js; this file wires them to the window, the keys
  * and the state file.
  *
  * In: `shell` and `manifest` from the plugin host; a payload through open().
@@ -44,6 +45,10 @@ Item {
   // "professional" | "playful", and the normalized theme of each (Service.qml).
   property string mode: "professional"
   property var themes: ({})
+  // What changed in the calendar since the card first opened (Logic.normalizeNotice), or null,
+  // and when its countdown closes the card (0 for never).
+  property var notice: null
+  property real closesAtMs: 0
 
   // ---- Time and input
   property real nowMs: Date.now()
@@ -116,11 +121,13 @@ Item {
     root.tenseSeconds = p.tenseSeconds
     root.mode = p.mode
     root.themes = p.themes
+    root.notice = p.notice
 
     var mon = Hyprland.focusedMonitor
     root.targetScreen = Quickshell.screens.find(function(s) { return mon && s.name === mon.name }) || null
     root.nowMs = Date.now()
     root.openedAtMs = root.nowMs
+    root.closesAtMs = p.notice && p.notice.closeInSeconds > 0 ? root.openedAtMs + p.notice.closeInSeconds * 1000 : 0
     root.guardKeyMs = 0
     sprite.reset()
     root.opened = true
@@ -193,7 +200,7 @@ Item {
     repeat: true
     onTriggered: {
       root.nowMs = Date.now()
-      if (Logic.isOver(root.endMs, root.nowMs)) root.dismiss()
+      if (Logic.shouldClose(root.endMs, root.closesAtMs, root.nowMs)) root.dismiss()
     }
   }
 
@@ -360,6 +367,23 @@ Item {
           // "started 12:34 ago" is wider than the card at this size.
           fontSizeMode: Text.HorizontalFit
           minimumPixelSize: Style.font.title
+        }
+
+        // What changed in the calendar, with the countdown when the card closes by itself; it
+        // adds nothing to the layout when there is no notice. Built by Logic.noticeText from a
+        // fixed vocabulary, never from calendar text.
+        Text {
+          visible: root.notice !== null
+          width: parent.width
+          text: Logic.noticeText(root.notice, root.nowMs, root.closesAtMs)
+          textFormat: Text.PlainText
+          color: root.signalColor
+          font.family: Style.font.family
+          font.pixelSize: Style.font.title
+          font.bold: true
+          maximumLineCount: 1
+          elide: Text.ElideRight
+          clip: true
         }
 
         // The theme's one-liner for this phase; it adds nothing to the layout when there is none.

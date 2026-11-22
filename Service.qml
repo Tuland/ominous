@@ -53,6 +53,14 @@ Item {
   // window for several ticks. Lost on shell restart, which at worst repeats an
   // alert still inside its window.
   property var fired: ({})
+  // The agenda card on screen, so a refresh can follow its meeting (Logic.followShown), or
+  // null. Set only when a summon succeeds; `test` and `preview` clear it.
+  property var shown: null
+  // When the countdown of the card on screen ends (epoch ms), 0 without one; set by summon().
+  property real closingUntilMs: 0
+  // When the hold of real alerts ends (epoch ms), 0 without one; set by the `hold` command, in
+  // memory only, so a shell restart ends it.
+  property real holdUntilMs: 0
   property string lastError: ""
   property real lastFetchMs: 0
 
@@ -98,7 +106,7 @@ Item {
   function payloadFor(ev: var): var { return root.withLook(Logic.eventPayload(ev)) }
 
   /**
-   * Opens the overlay with a payload.
+   * Opens the overlay with a payload, and notes when its countdown ends (Logic.closingUntil).
    *
    * @param payload The payload object.
    * @returns Whether the shell accepted it.
@@ -108,14 +116,54 @@ Item {
       root.log("shell cannot summon overlays")
       return false
     }
-    return root.shell.summon(root.pluginId, JSON.stringify(payload)) === true
+    const ok = root.shell.summon(root.pluginId, JSON.stringify(payload)) === true
+    if (ok) root.closingUntilMs = Logic.closingUntil(payload, Date.now())
+    return ok
   }
 
-  /** Alerts for the next due event, if any. Runs every 5 s. */
+  /**
+   * Alerts for the next due event, if any, unless a hold or a closing card holds alerts. The
+   * first run after a hold ends follows the agenda card first. Runs every 5 s.
+   */
   function tick(): void {
+    if (Logic.holdsAlerts(root.holdUntilMs, null, Date.now())) return
+    if (root.holdUntilMs !== 0) {
+      root.holdUntilMs = 0
+      root.follow()
+    }
+    // A closing card's note stays readable: new alerts wait for its countdown.
+    if (Logic.holdsAlerts(root.closingUntilMs, root.overlayOpen(), Date.now())) return
     var ev = Logic.claimDue(root.events, Date.now(), root.config, root.fired)
     if (!ev) return
-    root.log("alert for event " + Logic.quoted(ev.eventId) + (root.summon(root.payloadFor(ev)) ? "" : " (summon failed)"))
+    const ok = root.summon(root.payloadFor(ev))
+    if (ok) root.shown = Logic.shownFor(ev, root.config)
+    root.log("alert for event " + Logic.quoted(ev.eventId) + (ok ? "" : " (summon failed)"))
+  }
+
+  /**
+   * Whether the overlay is on screen, or null when the shell cannot tell.
+   *
+   * @returns true, false or null.
+   */
+  function overlayOpen(): var {
+    return root.shell && typeof root.shell.isPluginOpen === "function" ? root.shell.isPluginOpen(root.pluginId) === true : null
+  }
+
+  /**
+   * After a refresh, makes the agenda card on screen follow its meeting: Logic.followShown
+   * decides, this applies. A failed summon hides the card, so the old meeting never stays.
+   * During a hold the card is only forgotten when closed; tick() follows again when it ends.
+   */
+  function follow(): void {
+    const now = Date.now()
+    const r = Logic.followShown(root.shown, root.overlayOpen(), root.events, now, Logic.holdsAlerts(root.holdUntilMs, null, now))
+    if (r.action === "keep") return
+    if (r.action === "update" && root.summon(root.withLook(r.payload))) {
+      root.shown = r.next
+      return
+    }
+    if (r.action !== "forget" && root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
+    root.shown = null
   }
 
   /** Forgets alerts older than a day. */
@@ -222,24 +270,20 @@ Item {
 
   Process {
     id: agenda
-    command: ["omacal", "agenda", "--days", "2", "--json"]
+    // At most 1 MiB and one byte of OmaCal's output ever reaches the shell (Logic.AGENDA_COMMAND).
+    command: Logic.AGENDA_COMMAND
     stdout: StdioCollector { id: agendaOut; waitForEnd: true }
     onExited: function(exitCode) {
-      if (exitCode !== 0) {
-        root.lastError = "omacal exited with " + exitCode
-        root.log(root.lastError)
+      const r = Logic.readAgenda(root.events, agendaOut.text, exitCode)
+      root.events = r.events
+      root.lastError = r.error
+      if (r.error !== "") {
+        root.log(r.error)
         return
       }
-      try {
-        const parsed = JSON.parse(agendaOut.text)
-        root.events = Array.isArray(parsed.data) ? parsed.data : []
-        root.lastError = ""
-        root.lastFetchMs = Date.now()
-        root.tick()
-      } catch (e) {
-        root.lastError = "unreadable omacal output"
-        root.log(root.lastError)
-      }
+      root.lastFetchMs = Date.now()
+      root.follow()
+      root.tick()
     }
   }
 
@@ -270,9 +314,11 @@ Item {
     /** IPC: a synthetic meeting 60 s out, no calendar needed. */
     function test(): string {
       var now = Date.now()
-      return root.summon(root.withLook({ title: "Ominous test meeting", startMs: now + 60000, endMs: now + 30 * 60000,
-                                         location: "Nowhere in particular", calendar: "test",
-                                         url: "https://meet.google.com/" })) ? "ok" : "failed"
+      const ok = root.summon(root.withLook({ title: "Ominous test meeting", startMs: now + 60000, endMs: now + 30 * 60000,
+                                             location: "Nowhere in particular", calendar: "test",
+                                             url: "https://meet.google.com/" }))
+      if (ok) root.shown = null
+      return ok ? "ok" : "failed"
     }
 
     /**
@@ -287,7 +333,9 @@ Item {
       if (r.error) return r.error
       var p = root.withLook(r.payload)
       for (const k in r.overrides) p[k] = r.overrides[k]
-      return root.summon(p) ? "ok" : "failed"
+      const ok = root.summon(p)
+      if (ok) root.shown = null
+      return ok ? "ok" : "failed"
     }
 
     /** IPC: every theme on disk, where it comes from, and which mode uses it. */
@@ -318,6 +366,20 @@ Item {
     }
 
     /**
+     * IPC: holds real alerts for a while, for development captures: `hold 30` (whole seconds, at
+     * most 60); `hold 0` ends it. It ends by itself; `test` and `preview` still work.
+     *
+     * @param spec The seconds.
+     */
+    function hold(spec: string): string {
+      const r = Logic.holdCommand(spec, Date.now())
+      if (r.error) return r.error
+      root.holdUntilMs = r.untilMs
+      if (r.untilMs === 0) root.follow()
+      return r.message
+    }
+
+    /**
      * IPC: the complete effective config as text for ominous.json: your values, the defaults for
      * the rest, each key under a one-line comment, and the unknown keys and refused values of
      * your file named at the top. Prints only; no file is written.
@@ -341,7 +403,8 @@ Item {
         upcomingAlertable: s.upcomingAlertable,
         nextStart: s.nextStart,
         lastFetch: root.lastFetchMs ? new Date(root.lastFetchMs).toISOString() : null,
-        lastError: root.lastError
+        lastError: root.lastError,
+        holdSeconds: Logic.holdLeft(root.holdUntilMs, Date.now())
       })
     }
   }

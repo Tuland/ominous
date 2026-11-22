@@ -7,12 +7,20 @@
 #   shiba (tense)                  |  boss (angry)
 # Each card comes from tools/shoot-card.sh (a synthetic meeting on an opaque veil, so no part of
 # the desktop), placed in its quarter of a 1920x1080 canvas of the theme's background color.
-# Colors and font are those of the current Omarchy theme and shell.
+# Colors and font are those of the current Omarchy theme and shell. Real alerts are held during
+# the run (see tools/shoot-card.sh).
 # Look at the result before committing it.
 
 set -u
 cd "$(dirname "$0")/.." || exit 2
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+
+# Real alerts are held for the whole run, so none opens between two cards (shoot-card.sh renews
+# the hold before each one and stops, leaving it, when a card it did not open is on screen).
+[[ $(omarchy-shell ominous hold 60 2>/dev/null) == ok ]] || { echo "the running plugin cannot hold alerts: restart the shell" >&2; exit 1; }
+export OMINOUS_HOLD_OWNER=1
+trap 'omarchy-shell -q ominous hold 0 2>/dev/null; echo "real alerts released" >&2; rm -rf "$TMP"' EXIT
+echo "real alerts held while the cards are photographed" >&2
 
 for tool in magick fc-match; do command -v $tool >/dev/null || { echo "missing: $tool"; exit 1; }; done
 font=$(fc-match -f '%{file}' monospace)

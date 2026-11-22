@@ -132,3 +132,57 @@ describe("calendar text on the card", () => {
     assert.equal(L.eventPayload({ title: "   " }).title, "Meeting")
   })
 })
+
+describe("the note about a calendar change", () => {
+  const notice = (n) => L.normalizePayload({ notice: n }).notice
+
+  test("only known kinds and fields pass, in a fixed order", () => {
+    assert.equal(notice(undefined), null)
+    assert.equal(notice("changed"), null)
+    assert.equal(notice({ kind: "exploded" }), null)
+    assert.deepEqual([...notice({ kind: "changed", fields: ["link", "title", "link", "<b>x</b>", 3] }).fields], ["title", "link"])
+    assert.equal(notice({ kind: "changed", fields: [] }), null)
+    assert.equal(notice({ kind: "changed", fields: ["nope"] }), null)
+    assert.equal(notice({ kind: "removed" }).kind, "removed")
+  })
+
+  test("the countdown is a whole number of seconds from 1 to 60, else none", () => {
+    for (const bad of [0, 61, 1.5, "15", -1, NaN, null]) assert.equal(notice({ kind: "removed", closeInSeconds: bad }).closeInSeconds, 0, String(bad))
+    assert.equal(notice({ kind: "removed", closeInSeconds: 15 }).closeInSeconds, 15)
+    assert.equal(notice({ kind: "removed", closeInSeconds: 60 }).closeInSeconds, 60)
+  })
+
+  test("a move needs a date", () => {
+    for (const bad of [undefined, NaN, 9e15, -5, "1700000000000"]) assert.equal(notice({ kind: "moved", movedToMs: bad }), null, String(bad))
+    assert.equal(notice({ kind: "moved", movedToMs: 1_700_000_000_000 }).movedToMs, 1_700_000_000_000)
+  })
+
+  test("the texts of the spec", () => {
+    const at = (h, m, day = 0) => new Date(2026, 10, 23 + day, h, m).getTime()
+    const nowMs = at(9, 59), closes = nowMs + 15_000
+    const text = (n, c = 0) => L.noticeText(notice(n), nowMs, c)
+    assert.equal(text({ kind: "changed", fields: ["link"] }), "Changed in your calendar: link")
+    assert.equal(text({ kind: "changed", fields: ["place", "title"] }), "Changed in your calendar: title, place")
+    assert.equal(text({ kind: "removed", closeInSeconds: 15 }, closes), "Removed from your calendar - closing in 15 s")
+    assert.equal(text({ kind: "declined", closeInSeconds: 15 }, closes), "Declined in your calendar - closing in 15 s")
+    assert.equal(text({ kind: "moved", movedToMs: at(15, 0), closeInSeconds: 15 }, closes), "Moved to 15:00 - closing in 15 s")
+    assert.equal(text({ kind: "moved", movedToMs: at(9, 0, 1), closeInSeconds: 15 }, closes),
+                 "Moved to " + ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(at(9, 0, 1)).getDay()] + " 09:00 - closing in 15 s")
+    assert.equal(L.noticeText(null, nowMs, 0), "")
+  })
+
+  test("the countdown goes 15, 14 ... 1", () => {
+    const n = notice({ kind: "removed", closeInSeconds: 15 }), closes = 100_000
+    const seen = []
+    for (let t = closes - 15_000; t < closes; t += 250) seen.push(L.noticeText(n, t, closes).match(/(\d+) s$/)[1])
+    assert.deepEqual([...new Set(seen)].map(Number), [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+  })
+
+  test("the card closes at its end or at the countdown, whichever comes first", () => {
+    assert.equal(L.shouldClose(0, 0, 5000), false)
+    assert.equal(L.shouldClose(5000, 0, 5000), true)
+    assert.equal(L.shouldClose(0, 5000, 4999), false)
+    assert.equal(L.shouldClose(0, 5000, 5000), true)
+    assert.equal(L.shouldClose(3000, 5000, 3000), true)      // the meeting ends first
+  })
+})

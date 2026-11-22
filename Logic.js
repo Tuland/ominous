@@ -6,12 +6,13 @@
 //   Constants
 //   Values and links ......... numberOrNaN, quoted, cleanText, isThemeName, safeUrl, hostOf, linkHost, displayHost, shortHost, checkHostList, hostList, hostIn, joinTarget, unknownLinkTip
 //   Config and saved state ... checkConfig, normalizeConfig, stripJsonc, parseConfig, inlineJson, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
-//   Agenda ................... isAlertable, isConfirmed, eventKey, nextDue, isDueNow, claimDue, pruneFired, statusSnapshot
-//   Timing on the card ....... phase, progress, countdown, isOver
+//   Agenda ................... isAlertable, isConfirmed, eventKey, nextDue, isDueNow, claimDue, pruneFired, statusSnapshot, utf8Over, readAgenda
+//   The open card ............ validEventId, shownFor, changedFields, closingFollow, calendarFollow, followShown, closingUntil, holdsAlerts, holdCommand, holdLeft
+//   Timing on the card ....... phase, progress, countdown, isOver, shouldClose, clockLabel, noticeText
 //   Card input ............... isGuarded, initialSelection, nextSelection, activation
 //   Themes ................... normalizeSprite, normalizeTheme, pickTheme, frameAt
 //   Theme commands ........... themeCatalog, formatThemeList, themeCommand
-//   Payloads ................. eventPayload, look, normalizePayload, previewPayload
+//   Payloads ................. eventPayload, look, normalizeNotice, normalizePayload, previewPayload
 
 // ---------------------------------------------------------------- Constants
 
@@ -102,6 +103,23 @@ var GRACE_SECONDS = 120
 // so a flood of them gives at most one card a minute, however their starts are spread.
 var GROUP_SECONDS = 60
 
+// The most of OmaCal's output one agenda refresh accepts. The command reads one byte more, so a
+// cut output is always over the limit and the shell never holds more than that.
+var AGENDA_MAX_BYTES = 1048576
+// What the service runs for the agenda: `head` stops the read, and OmaCal gets SIGPIPE.
+var AGENDA_COMMAND = ["bash", "-c", "set -o pipefail; omacal agenda --days 2 --json | head -c " + (AGENDA_MAX_BYTES + 1)]
+// How long a card that follows a removed, declined or moved meeting stays before closing.
+var CLOSING_SECONDS = 15
+// The longest any wait for new alerts lasts: a hold (the `hold` command) or a closing card's
+// countdown (at most 60 s, normalizeNotice). A wait further away than this counts as over, so a
+// wall clock stepped back cannot stretch it.
+var HOLD_MAX_SECONDS = 60
+// The card fields a "changed" note can name, in the order it names them, with the payload key
+// each one stands for.
+var NOTICE_FIELDS = [["title", "title"], ["end", "endMs"], ["place", "location"], ["calendar", "calendar"], ["link", "url"]]
+var NOTICE_KINDS = ["changed", "moved", "removed", "declined"]
+var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
 var MAX_SPRITE = 32
 // Frames per phase: the shipped themes use 3; a theme travels in every alert's payload.
 var MAX_FRAMES = 64
@@ -143,6 +161,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {boolean} allDay
  * @property {string} response  The user's answer, e.g. "declined".
  * @property {boolean} organizer  Whether the user organizes it.
+ * @property {boolean} recurring  Whether it is an occurrence of a recurring series.
  *
  * @typedef {Object} PhaseLook  One phase of a theme.
  * @property {string} color  A color token, or "" for the card's default.
@@ -175,6 +194,25 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {string} mode
  * @property {{professional: Theme, playful: Theme}} themes
  * @property {string[]} joinHosts  The recognized join hosts.
+ * @property {?Notice} notice  What changed in the calendar since the card first opened, or null.
+ *
+ * @typedef {Object} Notice  A note on the card about a change in the calendar (normalizeNotice).
+ * @property {string} kind  "changed", "moved", "removed" or "declined".
+ * @property {string[]} fields  For "changed": the names of the changed card fields, in order.
+ * @property {number} closeInSeconds  Seconds until the card closes by itself, or 0 for never.
+ * @property {number} movedToMs  For "moved": the new start, epoch milliseconds; else 0.
+ *
+ * @typedef {Object} Shown  What the service remembers of the agenda card it opened.
+ * @property {string} key  eventKey of its event.
+ * @property {?string} eventId  The event's id as a string, or null when it has no valid one.
+ * @property {boolean} single  Whether the event is known not to recur (`recurring === false`).
+ * @property {Object<string, *>} fields  eventPayload of its event: what the card shows.
+ * @property {Config} cfg  The config when the card first opened: alertability is judged with it.
+ *
+ * @typedef {Object} Follow  What to do with the open card after a refresh (followShown).
+ * @property {string} action  "keep", "forget", "close" or "update".
+ * @property {Object<string, *>} [payload]  For "update": the meeting part of the payload, with its notice.
+ * @property {?Shown} [next]  For "update": what to remember once the summon succeeds.
  */
 
 // ---------------------------------------------------------------- Values and links
@@ -832,6 +870,233 @@ function statusSnapshot(events, cfg, nowMs) {
            nextStart: starts.length ? new Date(starts.reduce(function(a, b) { return Math.min(a, b) })).toISOString() : null }
 }
 
+/**
+ * Whether a text takes more than `max` bytes in UTF-8. A lone surrogate counts as the three
+ * bytes of the U+FFFD it is written as.
+ *
+ * @param {string} text The text.
+ * @param {number} max The limit, in bytes.
+ * @returns {boolean}
+ */
+function utf8Over(text, max) {
+  var bytes = 0
+  for (var i = 0; i < text.length && bytes <= max; i++) {
+    var c = text.charCodeAt(i)
+    if (c < 0x80) bytes += 1
+    else if (c < 0x800) bytes += 2
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < text.length && text.charCodeAt(i + 1) >= 0xdc00 && text.charCodeAt(i + 1) <= 0xdfff) { bytes += 4; i++ }
+    else bytes += 3
+  }
+  return bytes > max
+}
+
+/**
+ * What an agenda refresh yields, from the command's output and exit code. The size is checked
+ * first: a cut output makes the command exit with 141. A UTF-8 sequence cut by the limit is
+ * read as U+FFFD, three bytes, so a cut output always counts as over the limit. On any error the
+ * previous events stay in use.
+ *
+ * @param {AgendaEvent[]} previous The events in use before this refresh.
+ * @param {string} text What the command printed.
+ * @param {number} exitCode Its exit code.
+ * @returns {{events: AgendaEvent[], error: string}} error is "" on success.
+ */
+function readAgenda(previous, text, exitCode) {
+  text = String(text || "")
+  if (utf8Over(text, AGENDA_MAX_BYTES)) return { events: previous, error: "agenda too large" }
+  if (exitCode !== 0) return { events: previous, error: "omacal exited with " + exitCode }
+  try {
+    var parsed = JSON.parse(text)
+    return { events: parsed && Array.isArray(parsed.data) ? parsed.data : [], error: "" }
+  } catch (e) {
+    return { events: previous, error: "unreadable omacal output" }
+  }
+}
+
+// ---------------------------------------------------------------- The open card
+// After each refresh, the agenda card on screen follows its meeting: see followShown.
+
+/**
+ * An event's id as a string, or null when it has none a match can rely on.
+ *
+ * @param {*} id The event's `eventId`.
+ * @returns {?string}
+ */
+function validEventId(id) {
+  if (typeof id === "number" && isFinite(id)) return String(id)
+  if (typeof id === "string" && id !== "") return id
+  return null
+}
+
+/**
+ * What the service remembers of an agenda card once its summon succeeds.
+ *
+ * @param {AgendaEvent} ev The card's event.
+ * @param {Config} cfg The config to judge alertability with: the one in use when the card first opened.
+ * @returns {Shown}
+ */
+function shownFor(ev, cfg) {
+  return { key: eventKey(ev), eventId: validEventId(ev.eventId), single: ev.recurring === false, fields: eventPayload(ev), cfg: cfg }
+}
+
+/**
+ * The names of the card fields that differ between two meeting payloads, in NOTICE_FIELDS order.
+ *
+ * @param {Object<string, *>} a One payload's meeting part.
+ * @param {Object<string, *>} b The other's.
+ * @returns {string[]}
+ */
+function changedFields(a, b) {
+  return NOTICE_FIELDS.filter(function(f) { return a[f[1]] !== b[f[1]] }).map(function(f) { return f[0] })
+}
+
+/**
+ * The card that says the meeting is gone, declined or moved: the values the user has been
+ * reading, no link, and a note that closes the card after CLOSING_SECONDS.
+ *
+ * @param {Shown} shown The card on screen.
+ * @param {string} kind "removed", "declined" or "moved".
+ * @param {number} movedToMs For "moved", the new start; else 0.
+ * @returns {Follow}
+ */
+function closingFollow(shown, kind, movedToMs) {
+  /** @type {Object<string, *>} */
+  var payload = {}
+  for (var k in shown.fields) payload[k] = shown.fields[k]
+  payload.url = ""
+  /** @type {Object<string, *>} */
+  var notice = { kind: kind, closeInSeconds: CLOSING_SECONDS }
+  if (kind === "moved") notice.movedToMs = movedToMs
+  payload.notice = notice
+  return { action: "update", payload: payload, next: null }
+}
+
+/**
+ * What the calendar did to the meeting of the card on screen, without asking whether the card
+ * is still open. The rules apply in order; the first that matches wins.
+ *
+ * @param {Shown} shown The card on screen.
+ * @param {AgendaEvent[]} events The new agenda.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {Follow}
+ */
+function calendarFollow(shown, events, nowMs) {
+  var list = (events || []).filter(function(e) { return e && typeof e === "object" })
+  var same = null
+  for (var i = 0; i < list.length && !same; i++)
+    if (eventKey(list[i]) === shown.key) same = list[i]
+  if (same) {
+    if (!isAlertable(same, shown.cfg)) return closingFollow(shown, same.response === "declined" ? "declined" : "removed", 0)
+    if (isOver(Number(same.endMs) || 0, nowMs)) return { action: "close" }
+    /** @type {Object<string, *>} */
+    var fields = eventPayload(same)
+    var changed = changedFields(shown.fields, fields)
+    if (changed.length === 0) return { action: "keep" }
+    // Without an id, the key alone could belong to another event at the same start.
+    if (shown.eventId === null) return closingFollow(shown, "removed", 0)
+    fields.notice = { kind: "changed", fields: changed }
+    return { action: "update", payload: fields, next: shownFor(same, shown.cfg) }
+  }
+  // Another start for the same meeting. Only `recurring === false`, for the card's event and the
+  // candidate, counts: OmaCal does not say whether the occurrences of a series share an id, and a
+  // cancelled one must not read as moved. A start a Date cannot hold is never a candidate.
+  var old = Number(shown.fields.startMs)
+  /** @type {?AgendaEvent} */
+  var best = null
+  for (var j = 0; j < list.length && shown.eventId !== null && shown.single; j++) {
+    var e = list[j], start = Number(e.startMs)
+    if (validEventId(e.eventId) !== shown.eventId || e.recurring !== false || start === old) continue
+    if (!(start > 0 && start <= 8.64e15)) continue
+    if (!best || Math.abs(Number(e.startMs) - old) < Math.abs(Number(best.startMs) - old)) best = e
+  }
+  if (best && best.response === "declined") return closingFollow(shown, "declined", 0)
+  if (best && isAlertable(best, shown.cfg)) return closingFollow(shown, "moved", Number(best.startMs))
+  return closingFollow(shown, "removed", 0)
+}
+
+/**
+ * What to do, after a refresh, with the agenda card on screen. "keep" leaves it; "forget" drops
+ * what is remembered (the card was dismissed or closed); "close" hides it (its meeting is over,
+ * or the shell cannot say whether it is open); "update" summons `payload` and remembers `next`.
+ *
+ * While alerts are held (the `hold` command), the card is left as it is: only "forget" or
+ * "keep"; the service follows it once more when the hold ends.
+ *
+ * @param {?Shown} shown The card the service opened from the agenda, or null.
+ * @param {?boolean} isOpen Whether the card is on screen; null when the shell cannot tell.
+ * @param {AgendaEvent[]} events The new agenda.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {boolean=} held Whether alerts are held (default no).
+ * @returns {Follow}
+ */
+function followShown(shown, isOpen, events, nowMs, held) {
+  if (!shown) return { action: "keep" }
+  if (isOpen === false) return { action: "forget" }
+  if (held === true) return { action: "keep" }
+  var r = calendarFollow(shown, events, nowMs)
+  // Unknown: never leave old values on screen, never reopen a card the user dismissed.
+  return isOpen !== true && r.action !== "keep" ? { action: "close" } : r
+}
+
+/**
+ * When the countdown of a card the service just summoned ends: `nowMs` plus the payload's
+ * `notice.closeInSeconds`, or 0 when the card has no countdown. Read after every summon that
+ * succeeded, so any other card (an alert, a test, a preview, a changed meeting) clears it.
+ *
+ * @param {Object<string, *>} payload The payload the shell accepted.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {number} Epoch milliseconds, or 0.
+ */
+function closingUntil(payload, nowMs) {
+  var n = payload && payload.notice
+  var s = n && typeof n === "object" ? Number(n.closeInSeconds) : 0
+  return s > 0 ? nowMs + s * 1000 : 0
+}
+
+/**
+ * Whether new alerts wait: until a closing card's countdown ends or the card is gone (so its
+ * note can be read), or until a hold (the `hold` command, with `isOpen` null) ends. Nothing is
+ * claimed while they wait, so a due meeting alerts right after. With `isOpen` null only the
+ * time counts. A wait more than HOLD_MAX_SECONDS away counts as over: the bound if the wall
+ * clock steps back.
+ *
+ * @param {number} closingUntilMs From closingUntil; 0 when no countdown is on.
+ * @param {?boolean} isOpen Whether the card is on screen; null when the shell cannot tell.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {boolean}
+ */
+function holdsAlerts(closingUntilMs, isOpen, nowMs) {
+  return nowMs < closingUntilMs && closingUntilMs - nowMs <= HOLD_MAX_SECONDS * 1000 && isOpen !== false
+}
+
+/**
+ * Reads the `hold` command: whole seconds from 0 to HOLD_MAX_SECONDS, digits only. 0 ends the
+ * hold.
+ *
+ * @param {string} arg The argument, as typed.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {{untilMs: number, message: string}|{error: string}} When the hold ends (0 for none)
+ *     and what to print, or why the argument is refused.
+ */
+function holdCommand(arg, nowMs) {
+  var t = String(arg === undefined || arg === null ? "" : arg).trim()
+  var s = /^[0-9]{1,3}$/.test(t) ? Number(t) : NaN
+  if (!(s >= 0 && s <= HOLD_MAX_SECONDS)) return { error: "hold takes whole seconds from 0 to " + HOLD_MAX_SECONDS + " (0 ends the hold)" }
+  return s === 0 ? { untilMs: 0, message: "hold ended" } : { untilMs: nowMs + s * 1000, message: "ok" }
+}
+
+/**
+ * The whole seconds left in a hold, rounded up; 0 when it is over or, after a clock step back,
+ * further away than HOLD_MAX_SECONDS (the same bound as holdsAlerts).
+ *
+ * @param {number} untilMs When the hold ends, epoch milliseconds; 0 for none.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {number}
+ */
+function holdLeft(untilMs, nowMs) {
+  return holdsAlerts(untilMs, null, nowMs) ? Math.ceil((untilMs - nowMs) / 1000) : 0
+}
+
 // ---------------------------------------------------------------- Timing on the card
 
 /**
@@ -893,6 +1158,52 @@ function countdown(startMs, nowMs) {
  */
 function isOver(endMs, nowMs) {
   return endMs > 0 && nowMs >= endMs
+}
+
+/**
+ * Whether the card closes by itself now: at the meeting's end, or when its note's countdown
+ * runs out, whichever comes first.
+ *
+ * @param {number} endMs Meeting end, epoch milliseconds, or 0 when unknown.
+ * @param {number} closesAtMs When the note's countdown ends, or 0 for none.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {boolean}
+ */
+function shouldClose(endMs, closesAtMs, nowMs) {
+  return isOver(endMs, nowMs) || (closesAtMs > 0 && nowMs >= closesAtMs)
+}
+
+/**
+ * A time as the card shows it, "HH:mm" in local time, with the weekday first ("Tue 09:00")
+ * when it is not today.
+ *
+ * @param {number} ms The time, epoch milliseconds.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @returns {string}
+ */
+function clockLabel(ms, nowMs) {
+  var d = new Date(ms), today = new Date(nowMs)
+  var hhmm = ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2)
+  return d.toDateString() === today.toDateString() ? hhmm : WEEKDAYS[d.getDay()] + " " + hhmm
+}
+
+/**
+ * The note line on the card, built only from a fixed vocabulary, field names and a time: no
+ * text from the calendar or from the payload's sender.
+ *
+ * @param {?Notice} notice The normalized notice, or null.
+ * @param {number} nowMs Now, epoch milliseconds.
+ * @param {number} closesAtMs When the card closes by itself, or 0.
+ * @returns {string} "" without a notice.
+ */
+function noticeText(notice, nowMs, closesAtMs) {
+  if (!notice) return ""
+  var text = notice.kind === "changed" ? "Changed in your calendar: " + notice.fields.join(", ")
+           : notice.kind === "moved" ? "Moved to " + clockLabel(notice.movedToMs, nowMs)
+           : notice.kind === "declined" ? "Declined in your calendar"
+           : "Removed from your calendar"
+  if (closesAtMs > 0) text += " - closing in " + Math.max(0, Math.ceil((closesAtMs - nowMs) / 1000)) + " s"
+  return text
 }
 
 // ---------------------------------------------------------------- Card input
@@ -1192,6 +1503,32 @@ function look(cfg, mode, themes) {
 }
 
 /**
+ * What the overlay makes of a payload's notice. Anyone who can call the shell's IPC can send
+ * one, so only known kinds and field names pass, the countdown is bounded and the moved-to time
+ * must be a date; anything else means no notice.
+ *
+ * @param {*} n The payload's `notice`.
+ * @returns {?Notice}
+ */
+function normalizeNotice(n) {
+  if (!n || typeof n !== "object" || NOTICE_KINDS.indexOf(n.kind) < 0) return null
+  var out = { kind: String(n.kind), fields: /** @type {string[]} */ ([]), closeInSeconds: 0, movedToMs: 0 }
+  if (out.kind === "changed") {
+    var given = Array.isArray(n.fields) ? n.fields : []
+    out.fields = NOTICE_FIELDS.map(function(f) { return f[0] }).filter(function(name) { return given.indexOf(name) >= 0 })
+    if (out.fields.length === 0) return null
+  }
+  var c = n.closeInSeconds
+  if (typeof c === "number" && Math.floor(c) === c && c >= 1 && c <= 60) out.closeInSeconds = c
+  if (out.kind === "moved") {
+    var m = n.movedToMs
+    if (!(typeof m === "number" && m > 0 && m <= 8.64e15)) return null
+    out.movedToMs = m
+  }
+  return out
+}
+
+/**
  * What the overlay makes of a payload. Anyone who can call the shell's IPC can summon it, so
  * every field is checked again and a bad one gets its default.
  *
@@ -1211,6 +1548,7 @@ function normalizePayload(p) {
     tenseSeconds: isFinite(tense) && tense >= 0 && tense <= 3600 ? tense : DEFAULTS.tenseSeconds,
     mode: p.mode === "playful" ? "playful" : "professional",
     joinHosts: Array.isArray(p.joinHosts) ? hostList(p.joinHosts) : DEFAULTS.joinHosts.slice(),
+    notice: normalizeNotice(p.notice),
     // normalizeTheme({}) is never null: an empty object is a valid, empty theme.
     themes: { professional: normalizeTheme(themes.professional) || /** @type {Theme} */ (normalizeTheme({})),
               playful: normalizeTheme(themes.playful) || /** @type {Theme} */ (normalizeTheme({})) }

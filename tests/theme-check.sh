@@ -11,18 +11,21 @@
 # On exit, success or not, it puts the copy back, re-applies the original palette and diffs the
 # manifest: any difference is reported and the exit status is 1.
 # The pictures come from tools/shoot-card.sh: a synthetic card on an opaque veil, the theme
-# carried in the payload, so no desktop shows and no user theme file is touched.
+# carried in the payload, so no desktop shows and no user theme file is touched. Real alerts
+# are held for the whole run (shoot-card.sh renews the hold before each shot) and released on
+# exit; a card already on screen stops the run before anything is touched, left as it is.
 
 set -u
 OUT=${1:-$(mktemp -d)}; mkdir -p "$OUT"
 CUR=$HOME/.local/state/omarchy/current
-ID=io.github.tuland.ominous
 LIGHT="Catppuccin Latte"; DARK="Gruvbox"
 SNAP=$(mktemp -d)
 
 SHOOT=$(dirname "$0")/../tools/shoot-card.sh
-# Closes the card.
-hide() { omarchy-shell -q shell hide "$ID"; }
+# Whether a card of this plugin is on screen; a Hyprland that cannot say counts as yes.
+layer() { local l; l=$(hyprctl layers -j 2>/dev/null) || return 0; grep -q '"namespace": *"ominous-alert"' <<< "$l"; }
+# Holds real alerts for 60 s more.
+hold_alerts() { [[ $(omarchy-shell ominous hold 60 2>/dev/null) == ok ]]; }
 
 #######################################
 # Describes everything a theme change could touch, as stable text.
@@ -69,6 +72,17 @@ fi
 ORIGINAL=$(omarchy-theme-current)
 echo "saved: $ORIGINAL ($(wc -l < "$SNAP/before.txt") manifest lines) -> $SNAP"
 
+# Nothing is changed yet: a plugin that cannot hold, or a card on screen once held, stops the run
+# here (the card is left as it is).
+hold_alerts || { echo "the running plugin cannot hold alerts: restart the shell" >&2; rm -rf "$SNAP"; exit 1; }
+for _ in $(seq 25); do layer || break; sleep 0.2; done
+if layer; then
+  omarchy-shell -q ominous hold 0 2>/dev/null
+  echo "a card is on screen: close it and run again" >&2; rm -rf "$SNAP"; exit 1
+fi
+export OMINOUS_HOLD_OWNER=1
+echo "real alerts held while the cards are photographed" >&2
+
 restored=0
 #######################################
 # Puts the saved theme back, re-applies its palette and compares the manifest. Runs once, on
@@ -82,7 +96,8 @@ restored=0
 #######################################
 restore() {
   ((restored)) && return; restored=1
-  hide
+  # No hide: shoot-card.sh hides its own cards, and a card still up is not this run's.
+  omarchy-shell -q ominous hold 0 2>/dev/null; echo "real alerts released" >&2
   rm -rf "$CUR/theme"; cp -a "$SNAP/theme" "$CUR/theme"; cp -a "$SNAP/theme.name" "$CUR/theme.name"
   apply_palette
   sleep 1
@@ -107,11 +122,14 @@ trap 'exit 130' INT TERM
 #   The playful theme, the mode and the phase.
 #######################################
 shoot() {
-  "$SHOOT" "$2" "$3" "$4" "$OUT/$1.png" "Weekly sync" >/dev/null && echo "shot $1.png" || echo "FAIL shot $1"
+  "$SHOOT" "$2" "$3" "$4" "$OUT/$1.png" "Weekly sync" >/dev/null && { echo "shot $1.png"; return; }
+  echo "FAIL shot $1"
+  # A card shoot-card.sh did not open (it stopped and left it): stop before the next shot.
+  layer && { echo "FAIL a card is on screen: stopping" >&2; exit 1; }
 }
 
-hide
 for theme in "$LIGHT" "$DARK"; do
+  hold_alerts   # the theme change takes a while; no gap before the next shot
   OMARCHY_THEME_HEADLESS=1 OMARCHY_THEME_SKIP_BACKGROUND=1 omarchy-theme-set "$theme" >/dev/null || { echo "FAIL omarchy-theme-set '$theme'"; exit 1; }
   apply_palette; sleep 1.5
   slug=${theme// /-}
