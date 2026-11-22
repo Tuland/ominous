@@ -18,7 +18,7 @@ While the card is open, it follows your calendar (read once a minute):
 - If the meeting is removed, declined or moved to another time, the card keeps what it showed,
   hides Join, and says so ("Removed from your calendar", "Declined in your calendar",
   "Moved to 15:00") with a countdown: it closes after 15 seconds (or when the meeting ends, if
-  sooner), or at once with `Esc` or Dismiss. A moved meeting alerts again before its new start, if that start is still ahead.
+  sooner), or at once with `Esc` or Dismiss. A moved meeting alerts again for its new start while that start is still in its alert window.
   While the countdown runs, a new alert waits for it to end (or for you to close the card).
 - A card you dismissed does not come back for a change.
 

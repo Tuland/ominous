@@ -324,7 +324,11 @@ describe("the open card follows its meeting", () => {
 
   test("the config at open decides alertability: a later config change keeps the card", () => {
     const s = shown({})
-    // The meeting is in cfg's calendars; a config without it would not alert, but shown.cfg decides.
+    // The user drops the meeting's calendar after the card opened: under the new config the
+    // meeting would not alert, yet the card keeps, because shown.cfg (the config at open) decides.
+    const later = L.normalizeConfig({ calendars: ["other@example.com"], leadSeconds: 60 })
+    assert.equal(L.isAlertable(base({}), later), false)
+    assert.equal(L.isAlertable(base({}), s.cfg), true)
     assert.equal(follow(s, [base({})]).action, "keep")
     const onlyLink = L.normalizeConfig({ onlyWithLink: true })
     assert.equal(follow(shown({}, onlyLink), [base({ conference: "http://insecure.example/x" })]).payload.notice.kind, "removed")

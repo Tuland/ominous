@@ -262,15 +262,18 @@ unknown_link_opens() {
 check "a card with an unrecognized link opens and closes" unknown_link_opens
 
 # ---- a note about a calendar change
-# Summons a card with a "removed" note that closes by itself after $1 seconds.
+# Summons a card with a "removed" note that closes by itself after $1 seconds. Real alerts are
+# held first, so none replaces this card (the caller ends the hold).
 summon_closing() {
   local payload
+  [[ $(omarchy-shell ominous hold 60) == ok ]] || return 1
   payload=$(python3 -c 'import json, sys, time; n = time.time() * 1000; print(json.dumps({"title": "Live check", "startMs": n + 600000, "endMs": n + 1800000, "leadSeconds": 900, "notice": {"kind": "removed", "closeInSeconds": int(sys.argv[1])}}))' "$1")
   omarchy-shell shell summon "$ID" "$payload" >/dev/null
 }
 closes_after_countdown() {
-  summon_closing 2 && wait_for 15 overlay_open || return 1
-  wait_for 20 overlay_closed
+  if ! { summon_closing 2 && wait_for 15 overlay_open; }; then omarchy-shell ominous hold 0 >/dev/null; return 1; fi
+  wait_for 20 overlay_closed; local r=$?
+  omarchy-shell ominous hold 0 >/dev/null; return $r
 }
 check "a card with a closing note closes at the end of its countdown" closes_after_countdown
 
@@ -370,10 +373,12 @@ if ((KEYS)); then
     hide; wait_for 15 overlay_closed
     # Esc closes a card counting down at once, long before its countdown ends.
     esc_closes_countdown() {
-      summon_closing 20 && wait_for 15 overlay_open || return 1
+      # Held, so the key can only reach this card, never a real alert that replaced it.
+      if ! { summon_closing 20 && wait_for 15 overlay_open; }; then omarchy-shell ominous hold 0 >/dev/null; return 1; fi
       sleep 1.4   # past the input guard
       wtype -k Escape
-      wait_for 10 overlay_closed
+      wait_for 10 overlay_closed; local r=$?
+      omarchy-shell ominous hold 0 >/dev/null; return $r
     }
     check "Esc closes a card counting down at once" esc_closes_countdown
     hide

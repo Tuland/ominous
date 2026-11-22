@@ -17,7 +17,7 @@ All notable changes to Ominous are listed here. The format follows
   never the old one. When the meeting is removed, declined or moved, the card says so, hides
   Join and closes after a 15-second countdown, or at the meeting's end if sooner (`Esc` or
   Dismiss close it at once), and new alerts wait for the countdown; a moved meeting alerts
-  again before its new start, if that start is still ahead. A card you dismissed does not come
+  again for its new start while that start is still in its alert window. A card you dismissed does not come
   back.
 
 ### Security
