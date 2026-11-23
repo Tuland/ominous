@@ -78,6 +78,21 @@ describe("the card's input rules", () => {
   })
 })
 
+describe("the card's monitor", () => {
+  const three = ["eDP-1", "DP-4", "HDMI-A-1"]
+
+  test("the focused monitor, then the first", () => {
+    assert.equal(L.pickScreen(three, "HDMI-A-1"), 2)        // focus not at 0
+    assert.equal(L.pickScreen(three, "DP-9"), 0)            // focus not listed (e.g. just removed)
+    assert.equal(L.pickScreen(three, null), 0)              // focus unknown
+  })
+
+  test("no monitor", () => {
+    assert.equal(L.pickScreen([], "eDP-1"), -1)
+    assert.equal(L.pickScreen([], null), -1)
+  })
+})
+
 describe("sprite frames", () => {
   test("frameAt wraps and tolerates nothing to show", () => {
     const f = ["a", "b", "c"]

@@ -37,7 +37,17 @@ Item {
   // The recognized join hosts (from the config, cleaned by Logic.hostList), and what the link's
   // host makes of them.
   property var joinHosts: []
+  // The card's monitor (a Quickshell screen), or null while it has none; and the compositor's
+  // entry for it, null until Hyprland lists that monitor. The window shows only with both.
   property var targetScreen: null
+  readonly property var targetMonitor: {
+    // A destroyed screen may still be truthy: read its name only while Quickshell lists it.
+    if (Quickshell.screens.indexOf(root.targetScreen) < 0) return null
+    const monitors = Hyprland.monitors.values
+    for (let i = 0; i < monitors.length; i++)
+      if (monitors[i].name === root.targetScreen.name) return monitors[i]
+    return null
+  }
   // null = the theme's menu scrim; a number = that opacity over the theme background.
   property var dim: null
   property int leadSeconds: 60
@@ -123,8 +133,7 @@ Item {
     root.themes = p.themes
     root.notice = p.notice
 
-    var mon = Hyprland.focusedMonitor
-    root.targetScreen = Quickshell.screens.find(function(s) { return mon && s.name === mon.name }) || null
+    root.targetScreen = root.focusedScreen()
     root.nowMs = Date.now()
     root.openedAtMs = root.nowMs
     root.closesAtMs = p.notice && p.notice.closeInSeconds > 0 ? root.openedAtMs + p.notice.closeInSeconds * 1000 : 0
@@ -134,6 +143,33 @@ Item {
     // An alert that opens late is already angry: it jolts on arrival too.
     sprite.maybeShake()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
+
+  /**
+   * The monitor a card goes to now: the focused one, else the first listed (Logic.pickScreen),
+   * or null when none is connected.
+   */
+  function focusedScreen(): var {
+    var screens = Quickshell.screens
+    var names = screens.map(function(s) { return String(s.name) })
+    var mon = Hyprland.focusedMonitor
+    var i = Logic.pickScreen(names, mon ? String(mon.name) : null)
+    return i < 0 ? null : screens[i]
+  }
+
+  /**
+   * Follows the monitors while the card is open: when its monitor is no longer listed (or it has
+   * none), it drops it, lets Quickshell close the old window, then takes the focused one, as the
+   * shell's own overlays do. Showing the window takes the keyboard and restarts the guard
+   * (panel.onVisibleChanged).
+   */
+  function followScreens(): void {
+    if (!root.opened || Quickshell.screens.indexOf(root.targetScreen) >= 0) return
+    root.targetScreen = null
+    Qt.callLater(function() {
+      if (!root.opened || root.targetScreen !== null) return
+      root.targetScreen = root.focusedScreen()
+    })
   }
 
   /** Hides the card. Called by the shell. */
@@ -204,10 +240,16 @@ Item {
     }
   }
 
+  Connections {
+    target: Quickshell
+    /** A monitor was added or removed: the open card may have to move (followScreens). */
+    function onScreensChanged(): void { root.followScreens() }
+  }
+
   // ---- The window
   PanelWindow {
     id: panel
-    visible: root.opened
+    visible: root.opened && root.targetScreen !== null && root.targetMonitor !== null
     screen: root.targetScreen
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
@@ -215,6 +257,14 @@ Item {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     exclusionMode: ExclusionMode.Ignore
+    // Each time the card can be seen (opened, or moved to another monitor): take the keyboard and
+    // ignore input for a moment, since it appears under someone who may be typing. openedAtMs and
+    // closesAtMs stay, so a move does not lengthen a closing countdown.
+    // The guard starts at once, so no key already queued gets through before the focus is taken.
+    onVisibleChanged: if (visible) {
+      root.guardKeyMs = Date.now()
+      Qt.callLater(function() { if (panel.visible) keyCatcher.forceActiveFocus() })
+    }
 
     Rectangle {
       anchors.fill: parent

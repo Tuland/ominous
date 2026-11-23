@@ -6,6 +6,11 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The card vanished, while still counted open, when its monitor was unplugged: it now moves to
+  the focused monitor and stays there when the monitor returns. A card is also no longer lost
+  when the focused monitor cannot be matched as it opens.
+
 ## [0.3.2] - 2026-11-22
 
 ### Added

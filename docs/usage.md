@@ -79,3 +79,6 @@ if its alert window is still open. `status` shows the seconds left as `holdSecon
 - Nothing can draw over a locked screen: an alert fired while locked is waiting when you unlock,
   as long as the meeting has not ended.
 - A suspended laptop is not woken.
+- When the monitor showing the card is unplugged, the card moves to the focused monitor (or the
+  first one) and stays there when the monitor is plugged back in, even if your workspaces go
+  back to it. Keys are ignored for a second after it moves.

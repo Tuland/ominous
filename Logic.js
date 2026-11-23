@@ -9,7 +9,7 @@
 //   Agenda ................... isAlertable, isConfirmed, eventKey, nextDue, isDueNow, claimDue, pruneFired, statusSnapshot, utf8Over, readAgenda
 //   The open card ............ validEventId, shownFor, changedFields, closingFollow, calendarFollow, followShown, closingUntil, holdsAlerts, holdCommand, holdLeft
 //   Timing on the card ....... phase, progress, countdown, isOver, shouldClose, clockLabel, noticeText
-//   Card input ............... isGuarded, initialSelection, nextSelection, activation
+//   Card input ............... isGuarded, initialSelection, nextSelection, activation, pickScreen
 //   Themes ................... normalizeSprite, normalizeTheme, pickTheme, frameAt
 //   Theme commands ........... themeCatalog, formatThemeList, themeCommand
 //   Payloads ................. eventPayload, look, normalizeNotice, normalizePayload, previewPayload
@@ -1257,6 +1257,21 @@ function nextSelection(selected, url) {
  */
 function activation(selected, url) {
   return selected === 0 && url !== "" ? "join" : "dismiss"
+}
+
+/**
+ * The monitor the card goes on, as an index into `names` (the shell's monitors, in its order),
+ * or -1 when there is none: the focused one, else the first. Used for a new card and for a card
+ * whose monitor is gone; a card whose monitor is still listed is not moved, so this is not asked.
+ *
+ * @param {string[]} names The listed monitors' names.
+ * @param {?string} focusedName The focused monitor's name, or null when unknown.
+ * @returns {number}
+ */
+function pickScreen(names, focusedName) {
+  if (names.length === 0) return -1
+  if (focusedName !== null && names.indexOf(focusedName) >= 0) return names.indexOf(focusedName)
+  return 0
 }
 
 // ---------------------------------------------------------------- Themes
