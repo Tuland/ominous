@@ -107,6 +107,21 @@ describe(".gitignore", () => {
                                 { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim()
     assert.equal(hidden, "", ".gitignore matches tracked files:\n" + hidden)
   })
+
+  test("keeps the drafts and the fetched development tools out of the plugin", () => {
+    // One call per path (`git check-ignore a b` exits 0 when either one is ignored), and the
+    // rule must come from this repository's .gitignore, not from a global excludes file.
+    // Each path must be ignored by the folder rule itself, so a narrower rule (one file) fails.
+    const rules = { "drafts/x": "/drafts/", ".claude/skills/codixel/SKILL.md": "/.claude/skills/codixel/",
+                    ".claude/skills/.codixel-new/SKILL.md": "/.claude/skills/.codixel-new/",
+                    ".claude/skills/.codixel-old/SKILL.md": "/.claude/skills/.codixel-old/" }
+    for (const [path, rule] of Object.entries(rules)) {
+      const out = execFileSync("git", ["-c", "core.excludesFile=/dev/null", "check-ignore", "-v", path],
+                               { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim()
+      assert.match(out, new RegExp("^\\.gitignore:\\d+:" + rule.replaceAll(".", "\\.") + "\t" + path.replaceAll(".", "\\.") + "$"),
+                   path + " is not ignored by the rule " + rule + " of .gitignore")
+    }
+  })
 })
 
 describe("symlinks", () => {

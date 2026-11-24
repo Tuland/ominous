@@ -13,6 +13,13 @@ tests/results.log
 /.claude/skills/openspec-propose
 /.claude/skills/openspec-sync-specs
 /.claude/skills/openspec-update-change
+# Development-only third-party tools, fetched by `mise run setup` (tools/setup-dev.sh), and the
+# drafts made while exploring new character art: never part of the plugin users install.
+# tests/packaging.test.mjs checks that all four stay ignored.
+/.claude/skills/codixel/
+/.claude/skills/.codixel-new/
+/.claude/skills/.codixel-old/
+/drafts/
 
 # ---- Operating systems
 # Linux

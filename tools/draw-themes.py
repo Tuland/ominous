@@ -9,7 +9,7 @@ edit a function below, then run
     tools/draw-themes.py --check    write nothing; exit 1 if a theme file differs from this script
 
 tests/run.sh runs --check, so a hand edit to one of these JSON files has to be made here too.
-All characters are original and drawn from scratch; see docs/themes.md.
+All characters are original (no third-party art; see docs/themes.md).
 Palette letters: "." is transparent, roles (accent, urgent, muted, ...) follow the Omarchy theme.
 """
 import json

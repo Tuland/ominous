@@ -26,7 +26,11 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   for the service.
 - `themes/` — the shipped themes. `marine`, `shiba` and `boss` are drawn by
   `tools/draw-themes.py`: change the art there and rerun it, never the JSON by hand
-  (`tests/run.sh` fails if they differ).
+  (`tests/run.sh` fails if they differ). Today they are coordinates in the script; a redrawn
+  character will come from text grids in `tools/art/<theme>/`, exported from drafts (the reader
+  arrives with the first redrawn character; nothing reads that folder yet).
+- `drafts/` and `.claude/skills/codixel/` — ignored by git: art drafts, and the pixel-art skill
+  that `mise run setup` (`tools/setup-dev.sh`) fetches at a pinned commit. Never shipped.
 - `tests/` — `*.test.mjs` unit tests by concern sharing `helpers.mjs`, plus `live.sh` and
   `theme-check.sh` against the running shell, and `run.sh` to run them all.
 
@@ -37,7 +41,7 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   paths. Use placeholders such as `work@example.com`.
 - Calendar data is untrusted input: only `https://` URLs are ever opened (`Logic.safeUrl`), and Join is the default only for a host in `joinHosts` (`Logic.joinTarget`).
 - The status IPC never prints meeting titles.
-- Theme art is original: no traced sprites, no third-party names or trademarks in theme names.
+- Theme art is original: no traced or copied third-party art, no third-party names or trademarks in theme names; references only CC0, public domain or own (`ominous-theme` skill).
 - The plugin ID `io.github.tuland.ominous` is permanent (marketplace rule): never change it.
   `tests/packaging.test.mjs` checks every place it is written.
 - `preview.png` comes only from `tools/make-preview.sh` (synthetic cards, no desktop).

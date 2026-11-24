@@ -18,6 +18,15 @@ animates faster once angry. Their colors follow the Omarchy theme.
 The characters are original pixel art drawn for this plugin, a nod to 90s FPS status-bar faces
 and to the doge meme; they use no third-party artwork.
 
+Redrawn characters keep that rule. A redraw may start from a reference photo that is CC0, public
+domain or the author's own (never CC BY or CC BY-SA, never a recognizable person), pixelated as a
+starting point; the shipped frames are then redrawn by hand in the theme's palette. The photo
+itself is never shipped.
+
+### References
+
+The source of every reference image behind shipped art. None yet.
+
 ## Choosing a theme
 
 ```bash

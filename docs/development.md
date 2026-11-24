@@ -11,6 +11,13 @@ run `mise trust` and `mise install` once in the checkout, and every command ther
 Without mise, the tests still run with the system's tools, but a different version may report
 what the CI does not, or the reverse.
 
+`mise run setup` fetches the third-party tools used only for drawing characters, into folders
+git ignores (`tools/setup-dev.sh`). Today that is [codixel](https://github.com/mankidev/codixel)
+(MIT), a Claude Code skill for pixel art, pinned to one commit and written to
+`.claude/skills/codixel/`; nothing from it is checked out or run by the script, and the plugin
+never ships it. Run it once if you draw; the tests and the CI do not need it. To move to a newer
+commit, read its code first (as was done for the pinned one), then change the SHA in the script.
+
 Tools used only for development: `node` (unit tests), `python3` (scripts and the character
 generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc` and `mypy`
 (static checks),
@@ -27,6 +34,8 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `LinkNotice`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
+| `tools/setup-dev.sh` | Fetches the development-only third-party tools (`mise run setup`). |
+| `.claude/skills/codixel/`, `drafts/` | Ignored by git: the fetched pixel-art skill, and the drafts made while exploring new art (reference images, draft scripts, comparison sheets). A unit test checks that both stay ignored. |
 | `tools/make-config-docs.mjs` | Writes `docs/ominous.example.jsonc` and `docs/ominous.schema.json` from the config declaration in `Logic.js` (`--check` only compares); a unit test fails when they are stale. |
 | `.githooks/pre-push` | The pre-push hook: runs the unit checks before every push except a deletion. |
 | `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts, `tsc` on the JSDoc types of `Logic.js`, `mypy` on the Python. |
@@ -213,6 +222,14 @@ tests that hold each rule, then update the map. A finding that is not fixed stop
 
 `marine`, `shiba` and `boss` are drawn in `tools/draw-themes.py`. Change the art there and
 rerun it; never edit their JSON by hand, because `tests/run.sh` fails when the two differ.
+
+Today the three are drawn as coordinates in the script. A character being redrawn goes through
+drafts instead: reference images (CC0, public domain or own) and draft scripts using codixel
+(`mise run setup`) in `drafts/`, candidates compared on PNG sheets, then the chosen frames
+exported as text grids to `tools/art/<theme>/<phase>.txt` (rows of palette letters, frames
+separated by one empty line). That is the contract the first redrawn character implements,
+together with the reader in the script; until then nothing reads `tools/art/`. The
+[ominous-theme skill](../.claude/skills/ominous-theme/SKILL.md) has the rules and the steps.
 
 ```bash
 tools/draw-themes.py --show  # write the themes and print every frame as text, to review
