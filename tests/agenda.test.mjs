@@ -486,3 +486,19 @@ describe("holding alerts", () => {
     assert.equal(L.claimDue([late], until, cfg, {}), null)
   })
 })
+
+describe("test and preview cards are not followed", () => {
+  // The body of IPC function `name` in Service.qml: from its `function` line to the next one.
+  const body = (qml, name) => {
+    const start = qml.indexOf(`function ${name}(`)
+    assert.ok(start >= 0, `no function ${name}`)
+    const next = qml.indexOf("function ", start + 1)
+    return next < 0 ? qml.slice(start) : qml.slice(start, next)
+  }
+  const service = readFileSync(new URL("../Service.qml", import.meta.url), "utf8")
+
+  // With nothing remembered, a refresh keeps the card on screen (Logic.followShown).
+  test("test and preview forget the agenda card after a successful summon", () => {
+    for (const name of ["test", "preview"]) assert.match(body(service, name), /^\s*if \(ok\) root\.shown = null$/m, name)
+  })
+})

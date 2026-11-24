@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
 # Live checks against the RUNNING Omarchy shell, through the plugin's IPC.
-#   tests/live.sh [--restart] [--keys]
+#   tests/live.sh [--restart] [--keys] [--refresh]
 #     --restart  run `omarchy restart shell` first (needed after QML edits)
+#     --refresh  also check that a test card stays open across an agenda refresh; it waits for
+#                the service's next agenda read (about a minute, longer if the agenda is not read;
+#                the card holds the keyboard meanwhile), so it is run before a release
 #     --keys     also inject keystrokes with wtype (M toggles the mode); opt-in because
 #                it types into whatever has the keyboard if the card is not up yet
 # The card flashes on screen and grabs the keyboard several times. Your state file
 # and any user theme named marine are restored on exit, and ominous.json is only
 # read (its checksum is compared at the end).
-# Prints PASS/FAIL per check and a final `live: N passed, M failed` line; exits 1 on any failure.
+# Prints PASS/FAIL per check (a failure with its reason: the command's last stderr line that
+# reads like an error, else its last non-blank one) and a final `live: N passed, M failed` line; exits 1 on any failure.
 
 set -u
-RESTART=0; KEYS=0
+RESTART=0; KEYS=0; REFRESH=0
 for a in "$@"; do
-  case $a in --restart) RESTART=1 ;; --keys) KEYS=1 ;; *) echo "usage: $0 [--restart] [--keys]" >&2; exit 2 ;; esac
+  case $a in
+    --restart) RESTART=1 ;; --keys) KEYS=1 ;; --refresh) REFRESH=1 ;;
+    *) echo "usage: $0 [--restart] [--keys] [--refresh]" >&2; exit 2 ;;
+  esac
 done
 
 CONFIG=$HOME/.config/omarchy/ominous.json
@@ -26,16 +33,22 @@ pass=0; fail=0; failed=()
 #######################################
 # Runs one check and records the result.
 # Globals:
-#   pass, fail, failed
+#   pass, fail, failed, BK (its stderr goes to a file there)
 # Arguments:
 #   The check's description.
-#   The command and its arguments; its output is discarded.
+#   The command and its arguments; its stdout is discarded, and its stderr kept until it ends.
 # Outputs:
-#   PASS or FAIL with the description.
+#   PASS or FAIL with the description; a failure also with its reason from stderr (the last line
+#   that reads like an error, else the last non-blank one).
 #######################################
 check() {
-  local name=$1; shift
-  if "$@" >/dev/null 2>&1; then echo "PASS $name"; pass=$((pass + 1)); else echo "FAIL $name"; fail=$((fail + 1)); failed+=("$name"); fi
+  local name=$1 err=$BK/check.err reason; shift
+  if "$@" >/dev/null 2>"$err"; then echo "PASS $name"; pass=$((pass + 1)); return; fi
+  # A script's error line (node and Python end with a stack or a version), else the last line.
+  reason=$(grep -E '^[A-Za-z.]*(Error|Exception)\b' "$err" | tail -n 1)
+  [[ -n $reason ]] || reason=$(grep -v '^[[:space:]]*$' "$err" | tail -n 1)
+  name+=${reason:+: $reason}
+  echo "FAIL $name"; fail=$((fail + 1)); failed+=("$name")
 }
 
 # Closes the card.
@@ -281,20 +294,37 @@ check "a card with a closing note closes at the end of its countdown" closes_aft
 last_fetch() { jsonget "d['lastFetch']"; }
 # Whether the agenda was read again since FETCH_BEFORE.
 fetched_since() { [[ $(last_fetch) != "$FETCH_BEFORE" ]]; }
-# Opens a card with IPC command $1 (and argument $2), waits for the next agenda refresh (once a
-# minute), and checks the card is still there: the follow-up only touches agenda cards.
+# Opens a card with `test`, waits for the next agenda refresh (once a minute), and checks the card
+# is still there: the follow-up only touches agenda cards. On failure the last stderr line says
+# what was seen: the summon answer, the card after the summon, lastFetch before and after the
+# wait, lastError, and the card before it is closed.
 stays_across_refresh() {
-  [[ $(omarchy-shell ominous "$@") == ok ]] && wait_for 15 overlay_open || return 1
-  # Read once the card is up, so the refresh waited for comes after it opened.
-  FETCH_BEFORE=$(last_fetch)
-  wait_for 450 fetched_since || { echo "no agenda refresh within 90 s" >&2; hide; return 1; }
-  sleep 1
-  overlay_open; local open=$?
-  hide; wait_for 15 overlay_closed
-  return $open
+  local answer="" opened=no after="-" error="-" open_end=no r=1
+  FETCH_BEFORE="-"
+  {
+    answer=$(omarchy-shell ominous test)
+    if [[ $answer == ok ]] && wait_for 15 overlay_open; then
+      opened=yes
+      # Read once the card is up, so the refresh waited for comes after it opened.
+      FETCH_BEFORE=$(last_fetch)
+      if wait_for 450 fetched_since; then
+        sleep 1
+        overlay_open && { open_end=yes; r=0; }
+      else
+        overlay_open && open_end=yes
+      fi
+      after=$(last_fetch); error=$(jsonget "d['lastError']")
+      hide; wait_for 15 overlay_closed
+    fi
+  } 2>/dev/null
+  ((r == 0)) || echo "summon=${answer:-none} open_after_summon=$opened lastFetch_before=$FETCH_BEFORE lastFetch_after=$after lastError=${error:-none} open_before_hide=$open_end" >&2
+  return $r
 }
-check "a test card stays open across an agenda refresh" stays_across_refresh test
-check "a preview card stays open across an agenda refresh" stays_across_refresh preview "relaxed professional"
+if ((REFRESH)); then
+  check "a test card stays open across an agenda refresh" stays_across_refresh
+else
+  echo "SKIP a test card stays open across an agenda refresh (needs --refresh)"
+fi
 
 # ---- holding real alerts
 case $restart_hold in

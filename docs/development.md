@@ -44,6 +44,8 @@ tests/run.sh                 # all checks: unit + art check + lint + live agains
 tests/run.sh --unit          # unit + art check + lint; needs no shell
 tools/lint.sh                # lint only: qmllint, shellcheck, tsc, mypy
 tests/run.sh --live --restart --keys   # live only, after a QML edit; --keys also types M on the card
+tests/run.sh --restart --refresh       # all checks; --refresh also checks that a test card stays open
+                                       # across an agenda refresh (about a minute). Run before a release
 tests/theme-check.sh <dir>   # the card under a light and a dark Omarchy theme, screenshots in <dir>;
                              # puts your Omarchy theme back and proves it
 ```
@@ -66,7 +68,9 @@ blocks a push that fails it. Git does not enable hooks by itself: run
 `git config core.hooksPath .githooks` once in each checkout. `git push --no-verify` skips it on
 purpose.
 
-The live checks use your real session: the card shows up and grabs the keyboard several times.
+The live checks use your real session: the card shows up and grabs the keyboard several times,
+for a few seconds each, and for about a minute in a row with `--refresh` (longer if the agenda
+is not read).
 They restore the state files and any user theme they touch, and check that `ominous.json` is
 unchanged.
 
@@ -135,7 +139,7 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 | OmaCal agenda: title and link | The journal and `status` | Only the event id is logged, quoted (`Logic.quoted`); `status` never prints a title | `tests/style.test.mjs` (log lines, a check of each line, not of the data flow), `tests/agenda.test.mjs` (`status` of an agenda with titles) |
 | OmaCal agenda: number of events | The card taking the screen and the keyboard | One card per group: when an alert fires, every unconfirmed event (not accepted, not organized) starting within the next minute counts as alerted (`Logic.claimDue`), so a flood gives at most one card a minute; a confirmed event always gets its own card and wins a tie; a start a `Date` cannot hold is not alertable | `tests/agenda.test.mjs` |
 | OmaCal agenda: size of the output | The shell's memory | The command reads at most 1 MiB and one byte (`Logic.AGENDA_COMMAND`, `head -c`); more than 1 MiB, counted in UTF-8 bytes, is refused as "agenda too large" and the events read before stay in use (`Logic.readAgenda`). No cap on the number of events: within 1 MiB the work per tick is linear, and a cap could push out a meeting the user accepted | `tests/agenda.test.mjs` (the command under a stub `omacal`, the byte count, the kept events) |
-| OmaCal agenda: a meeting changed while its card is open | The link Join opens, the text on the card | After each refresh the agenda card follows its meeting (`Logic.followShown`): changed fields update the card with a note and the usual selection rule for the new link; removed, declined or moved meetings get a closing card without a link; a dismissed card never reopens; when the shell cannot say whether the card is open, a change hides it; during a `hold` (at most 60 s) the card keeps what it shows and is followed once when the hold ends. The service glue is checked by review only (see the change `fix-0-3-1-manual-review`, design, known limit) | `tests/agenda.test.mjs`, `tests/live.sh` (test and preview cards across a refresh) |
+| OmaCal agenda: a meeting changed while its card is open | The link Join opens, the text on the card | After each refresh the agenda card follows its meeting (`Logic.followShown`): changed fields update the card with a note and the usual selection rule for the new link; removed, declined or moved meetings get a closing card without a link; a dismissed card never reopens; when the shell cannot say whether the card is open, a change hides it; during a `hold` (at most 60 s) the card keeps what it shows and is followed once when the hold ends. How `follow()` applies that to a real agenda is checked by review only (see the change `fix-0-3-1-manual-review`, design, known limit); that `test` and `preview` cards are not followed is pinned by a unit test and checked live | `tests/agenda.test.mjs` (including `test` and `preview` forgetting the agenda card), `tests/live.sh --refresh` (a test card across a refresh) |
 | Keys while the card opens | Joining or dismissing | Input is ignored for a second after the card opens or moves to another monitor, and after every key pressed while ignored, decided at the moment of the input (`Logic.isGuarded`) | `tests/card.test.mjs`, `tests/style.test.mjs` (every input handler of `Alert.qml` asks `guardedNow()`), `tests/live.sh` (keys) |
 | IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again with the config's ranges (`dim` 0 to 1, seconds 0 to 3600), `joinHosts` included; the `notice` passes only with a known kind and known field names, a countdown of 1 to 60 whole seconds and a moved-to time a `Date` holds (`Logic.normalizeNotice`), and its line is built from a fixed vocabulary, never from payload text (`Logic.noticeText`) | `tests/payload.test.mjs` |
 | `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.checkConfig` (a refused value falls back to its default and is reported in `ignoredValues`), `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
@@ -228,7 +232,7 @@ the `ominous-release` skill, which also proposes the version from what changed.
 2. Audit the whole code as "Auditing before a release" above describes; a finding stops the
    release. Check that every new `ominous.json` key is in the changelog.
 3. Rename `Unreleased` to the version and date, set the same `version` in `manifest.json`
-   (`tests/packaging.test.mjs` fails if they differ), and run `tests/run.sh --restart`. If
+   (`tests/packaging.test.mjs` fails if they differ), and run `tests/run.sh --restart --refresh`. If
    the card looks different, also run `tests/theme-check.sh <dir>` and `tools/make-preview.sh`,
    and look at `preview.png` before committing it.
 4. Commit `Release X.Y.Z`, tag it `vX.Y.Z` (annotated), push the branch and the tag, check that

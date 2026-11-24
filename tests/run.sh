@@ -3,7 +3,7 @@
 #   tests/run.sh                  unit (node --test, themes vs tools/draw-themes.py, tools/lint.sh) + live (needs the running shell)
 #   tests/run.sh --unit           unit only; needs no shell
 #   tests/run.sh --live           live only
-#   tests/run.sh --restart --keys  passed on to tests/live.sh (see its header)
+#   tests/run.sh --restart --keys --refresh  passed on to tests/live.sh (see its header)
 cd "$(dirname "$0")/.." || exit 2
 
 UNIT=1; LIVE=1; LIVE_ARGS=()
@@ -11,8 +11,8 @@ for a in "$@"; do
   case $a in
     --unit) LIVE=0 ;;
     --live) UNIT=0 ;;
-    --restart|--keys) LIVE_ARGS+=("$a") ;;
-    *) echo "usage: $0 [--unit|--live] [--restart] [--keys]" >&2; exit 2 ;;
+    --restart|--keys|--refresh) LIVE_ARGS+=("$a") ;;
+    *) echo "usage: $0 [--unit|--live] [--restart] [--keys] [--refresh]" >&2; exit 2 ;;
   esac
 done
 

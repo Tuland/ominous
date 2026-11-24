@@ -92,7 +92,8 @@ step 5, right after the push, so keep this audit at least as strict as what it c
    Added / Changed / Fixed (Removed and Security when needed), breaking items first with what
    the user does about them. Update the compare links at the bottom.
 2. Set `version` in `manifest.json` to `X.Y.Z`.
-3. Run `mise exec -- tests/run.sh --restart` (live checks, after an `omarchy restart shell`). If the card's
+3. Run `mise exec -- tests/run.sh --restart --refresh` (live checks, after an `omarchy restart shell`;
+   `--refresh` adds the minute-long agenda refresh check, so tell the user first). If the card's
    look changed, also run `tests/theme-check.sh <scratchpad dir>` (it switches the Omarchy
    theme for a minute: ask first) and regenerate the picture with `tools/make-preview.sh`,
    showing it to the user before committing.

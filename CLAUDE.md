@@ -71,6 +71,7 @@ tests/run.sh                     # everything: unit + art check + lint + live, o
 tests/run.sh --unit              # unit + art check + lint, no shell needed
 tools/lint.sh                    # qmllint (QML), shellcheck (scripts), tsc (Logic.js types), mypy (Python)
 tests/run.sh --live --restart    # live only, after a QML edit (add --keys to inject M keystrokes)
+tests/run.sh --restart --refresh # all checks plus a test card across an agenda refresh (about a minute); the release steps run this
 tests/theme-check.sh <dir>       # card under a light and a dark Omarchy theme, screenshots in <dir>; restores the theme and proves it
 omarchy restart shell            # QML changes: an already-summoned overlay keeps old code
 omarchy-shell ominous test       # synthetic alert now
@@ -80,8 +81,9 @@ omarchy-shell ominous status     # config, counts, next start, last error, holdS
 omarchy-shell ominous hold 30    # hold real alerts (at most 60 s, ends by itself); hold 0 ends it
 ```
 
-Live checks and screenshots touch the user's real session: the card grabs the keyboard, so
-never inject keys unless the overlay is open; restore any state file or theme you change.
+Live checks and screenshots touch the user's real session: the card grabs the keyboard (for
+about a minute in a row with `--refresh`: say so first), so never inject keys unless the overlay
+is open; restore any state file or theme you change.
 Before holding real alerts, with `hold` or through `tools/shoot-card.sh`, `tools/make-preview.sh`
 or `tests/theme-check.sh`, say so to the user; afterwards check that `status` shows
 `holdSeconds` 0. To
