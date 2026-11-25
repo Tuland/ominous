@@ -8,9 +8,9 @@
 //   Config and saved state ... checkConfig, normalizeConfig, stripJsonc, parseConfig, inlineJson, formatConfig, configSchema, resolveMode, parseThemeOverrides, resolveThemes
 //   Agenda ................... isAlertable, isConfirmed, eventKey, nextDue, isDueNow, claimDue, pruneFired, statusSnapshot, utf8Over, readAgenda
 //   The open card ............ validEventId, shownFor, changedFields, closingFollow, calendarFollow, followShown, closingUntil, holdsAlerts, holdCommand, holdLeft
-//   Timing on the card ....... phase, progress, countdown, isOver, shouldClose, clockLabel, noticeText
+//   Timing on the card ....... phase, progress, countdown, countdownSample, unusedDescent, isOver, shouldClose, clockLabel, noticeText
 //   Card input ............... isGuarded, initialSelection, nextSelection, activation, pickScreen
-//   Themes ................... normalizeSprite, normalizeTheme, pickTheme, frameAt
+//   Themes ................... normalizeSprite, normalizeTheme, pickTheme, frameAt, nextFrame, joltOnEnter, joltOnStep, sameArt, spriteTop
 //   Theme commands ........... themeCatalog, formatThemeList, themeCommand
 //   Payloads ................. eventPayload, look, normalizeNotice, normalizePayload, previewPayload
 
@@ -120,7 +120,7 @@ var NOTICE_FIELDS = [["title", "title"], ["end", "endMs"], ["place", "location"]
 var NOTICE_KINDS = ["changed", "moved", "removed", "declined"]
 var WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-var MAX_SPRITE = 32
+var MAX_SPRITE = 40
 // Frames per phase: the shipped themes use 3; a theme travels in every alert's payload.
 var MAX_FRAMES = 64
 var DEFAULT_FRAME_MS = 500
@@ -169,6 +169,7 @@ var THEME_USAGE = 'usage: theme "<name> [professional|playful]" or theme "reset 
  * @property {string[][]} frames  Sprite frames, each a list of text rows.
  * @property {number} frameMs
  * @property {boolean} shake
+ * @property {number} loopFrom  The first looped frame: frames before it play once, as an intro.
  *
  * @typedef {Object} Theme  A theme file after normalizeTheme.
  * @property {boolean} progress  Whether the card shows the progress line.
@@ -1150,6 +1151,32 @@ function countdown(startMs, nowMs) {
 }
 
 /**
+ * A countdown text with the same letters the card shows in this part of the meeting, for
+ * measuring how far its ink reaches below the line: "in 0:01" before the start, "started 0:01
+ * ago" after it. Taken from the phase, not from the live text, so the layout changes in the same
+ * instant as the phase, not a second later when "now" turns into "started 0:01 ago".
+ *
+ * @param {boolean} started Whether the meeting has started (the angry phase).
+ * @returns {string}
+ */
+function countdownSample(started) {
+  return countdown(0, started ? 1000 : -1000)
+}
+
+/**
+ * The part of a line's descent that its ink does not use, in whole pixels: the room under a
+ * text that the next line can take. The ink reaches `inkBelow` pixels below the baseline (0 or
+ * less when nothing hangs below it).
+ *
+ * @param {number} descent The font's descent, in pixels.
+ * @param {number} inkBelow How far the ink reaches below the baseline, in pixels.
+ * @returns {number} At least 0.
+ */
+function unusedDescent(descent, inkBelow) {
+  return Math.max(0, Math.floor(descent - Math.max(0, inkBelow)))
+}
+
+/**
  * Whether the meeting is over, so the card closes by itself.
  *
  * @param {number} endMs Meeting end, epoch milliseconds, or 0 when unknown.
@@ -1300,8 +1327,9 @@ function normalizeSprite(rawPalette, rawPhases) {
   for (var i = 0; i < PHASES.length; i++) {
     var rawFrames = rawPhases[PHASES[i]] && rawPhases[PHASES[i]].frames
     frames[PHASES[i]] = []
-    if (rawFrames === undefined) continue
-    if (!Array.isArray(rawFrames) || rawFrames.length === 0 || rawFrames.length > MAX_FRAMES) return null
+    // No frames, or an empty list (what normalizeTheme writes for such a phase): no sprite here.
+    if (rawFrames === undefined || (Array.isArray(rawFrames) && rawFrames.length === 0)) continue
+    if (!Array.isArray(rawFrames) || rawFrames.length > MAX_FRAMES) return null
     for (var f = 0; f < rawFrames.length; f++) {
       var frame = rawFrames[f]
       if (!Array.isArray(frame) || frame.length < 1 || frame.length > MAX_SPRITE) return null
@@ -1336,6 +1364,9 @@ function normalizeTheme(raw) {
   PHASES.forEach(function(name) {
     var p = rawPhases[name] && typeof rawPhases[name] === "object" ? rawPhases[name] : {}
     var ms = numberOrNaN(p.frameMs)
+    var count = sprite ? sprite.frames[name].length : 0
+    var loopFrom = typeof p.loopFrom === "number" && Math.floor(p.loopFrom) === p.loopFrom &&
+                   p.loopFrom >= 0 && p.loopFrom < count ? p.loopFrom : 0
     var color = typeof p.color === "string" ? p.color.trim() : ""
     var caption = typeof p.caption === "string" || typeof p.caption === "number" ? cleanText(String(p.caption), 80) : ""
     theme.phases[name] = {
@@ -1343,7 +1374,8 @@ function normalizeTheme(raw) {
       caption: caption,
       frames: sprite ? sprite.frames[name] : [],
       frameMs: isFinite(ms) ? Math.min(5000, Math.max(80, Math.round(ms))) : DEFAULT_FRAME_MS,
-      shake: p.shake === true
+      shake: p.shake === true,
+      loopFrom: loopFrom
     }
   })
   return theme
@@ -1387,6 +1419,81 @@ function pickTheme(name, user, shipped, fallback) {
  */
 function frameAt(frames, index) {
   return frames && frames.length > 0 ? frames[((index % frames.length) + frames.length) % frames.length] : null
+}
+
+/**
+ * The frame after `index`: the next one, or `loopFrom` after the last, so the frames before
+ * `loopFrom` play once as an intro and the rest loop.
+ *
+ * @param {number} index The frame shown now.
+ * @param {number} count How many frames the phase has.
+ * @param {number} loopFrom The first looped frame (normalized: 0 <= loopFrom < count).
+ * @returns {number} The frame to show next; 0 when there are no frames.
+ */
+function nextFrame(index, count, loopFrom) {
+  if (count <= 0) return 0
+  return index + 1 < count ? index + 1 : loopFrom
+}
+
+/**
+ * Whether the sprite jolts as soon as it shows this phase: only angry, only when the theme asks
+ * for it, and only without an intro (with one, the jolt waits for the loop: joltOnStep).
+ *
+ * @param {string} phase The phase name.
+ * @param {PhaseLook} spec The phase's look.
+ * @returns {boolean}
+ */
+function joltOnEnter(phase, spec) {
+  return phase === "angry" && spec.shake === true && spec.loopFrom === 0
+}
+
+/**
+ * Whether the sprite jolts on this frame step: when an angry intro hands over to its loop,
+ * that is, on the step from frame `loopFrom - 1` to `loopFrom`. That step happens once per
+ * intro, since the loop comes back to `loopFrom` from its last frame.
+ *
+ * @param {string} phase The phase name.
+ * @param {PhaseLook} spec The phase's look.
+ * @param {number} from The frame shown before the step.
+ * @param {number} to The frame shown after it.
+ * @returns {boolean}
+ */
+function joltOnStep(phase, spec, from, to) {
+  return phase === "angry" && spec.shake === true && spec.loopFrom > 0 &&
+         to === spec.loopFrom && from === spec.loopFrom - 1
+}
+
+/**
+ * Whether two normalized themes draw the same animation: same size, palette, and frames and
+ * `loopFrom` in every phase. An open card gets a fresh theme object with each update, and only a
+ * real change of art restarts the frames.
+ *
+ * @param {?Theme} before The theme shown so far, or null.
+ * @param {?Theme} after The theme now.
+ * @returns {boolean} false when either is null.
+ */
+function sameArt(before, after) {
+  if (!before || !after) return false
+  if (before.cols !== after.cols || before.rows !== after.rows) return false
+  if (JSON.stringify(before.palette) !== JSON.stringify(after.palette)) return false
+  return PHASES.every(function(name) {
+    var a = before.phases[name], b = after.phases[name]
+    return a.loopFrom === b.loopFrom && JSON.stringify(a.frames) === JSON.stringify(b.frames)
+  })
+}
+
+/**
+ * Where the sprite's top goes: centred on the text band beside it (from the title to the last
+ * line before the buttons), in whole pixels, and never above the top of the text column.
+ *
+ * @param {number} bandTop The band's top.
+ * @param {number} bandBottom The band's bottom.
+ * @param {number} spriteHeight The sprite's height.
+ * @param {number} columnTop The text column's top.
+ * @returns {number} The sprite's y, in the same coordinates.
+ */
+function spriteTop(bandTop, bandBottom, spriteHeight, columnTop) {
+  return Math.max(columnTop, Math.round(bandTop + (bandBottom - bandTop - spriteHeight) / 2))
 }
 
 // ---------------------------------------------------------------- Theme commands

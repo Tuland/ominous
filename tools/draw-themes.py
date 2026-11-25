@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Draws the playful themes' pixel art and writes themes/marine.json, shiba.json and boss.json.
 
-The art is code so that each expression is built from the same face and changes stay small:
-edit a function below, then run
+The marine comes from text grids in tools/art/marine/ (read by read_grids, exported from approved
+drafts); shiba and boss are still code, so each expression is built from the same face and
+changes stay small. Edit a grid or a function below, then run
 
     tools/draw-themes.py            write the three theme files
     tools/draw-themes.py --show     write them and print every frame as text, to review
@@ -21,8 +22,12 @@ Grid = list[list[str]]  # N rows of N palette characters
 Frame = list[str]  # the grid as text rows, as a theme file stores it
 Theme = dict[str, Any]  # a theme file's JSON object
 
-N = 16
+N = 16  # shiba and boss, still drawn as coordinates
 THEMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "themes")
+ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
+PHASES = ("relaxed", "tense", "angry")
+MAX_CELLS = 40  # the card's sprite limit (Logic.MAX_SPRITE)
+MAX_FRAMES = 64  # per phase (Logic.MAX_FRAMES)
 
 
 def blank() -> Grid:
@@ -63,77 +68,110 @@ def rows(g: Grid) -> Frame:
 
 
 # ---------------------------------------------------------------- marine
-def marine(mood: str, variant: int = 0) -> Frame:
-    """Draws the marine: a soldier in a helmet.
+# The marine is drawn from text grids (tools/art/marine/<phase>.txt), exported from approved
+# drafts; this script owns its palette, captions and timing. The grid letters below are the
+# exporter's: tones of the bust and the close-up (dark to light), the four fire tones (deep red,
+# orange, yellow, pale yellow core) and the sweat drop.
+MARINE_PALETTE: dict[str, str] = {
+        ".": "transparent",
+        "a": "#080605", "b": "#090706", "c": "#1c1411", "d": "#1b1511", "e": "#1f1714", "f": "#2f1f1a",
+        "g": "#392923", "h": "#3c2d27", "i": "#4b3a31", "j": "#8e1f12", "k": "#4b3b33", "l": "#4b4d2f",
+        "m": "#59483d", "n": "#5d463e", "o": "#6a4d43", "p": "#6b5249", "q": "#60574e", "r": "#5c5f39",
+        "s": "#78594d", "t": "#66693f", "u": "#7c5d53", "v": "#696c42", "w": "#72635a", "x": "#906659",
+        "y": "#7c6e69", "z": "#757848", "A": "#db4f16", "B": "#91685b", "C": "#81736e", "D": "#7b7e4e",
+        "E": "#9f766a", "F": "#868954", "G": "#a37768", "H": "#8e817c", "I": "#90945b", "J": "#af8274",
+        "K": "#979a5f", "L": "#b6897a", "M": "#9c9897", "N": "#9ea268", "O": "#a2a56d", "P": "#c19486",
+        "Q": "#b4a69c", "R": "#f59e22", "S": "#afb281", "T": "#d2a79c", "U": "#8ec6e8", "V": "#d7b7ab",
+        "W": "#c4e6f6", "X": "#fde084", "Y": "#eef9ff",
+}
+
+
+class GridError(Exception):
+    """A grid file outside the contract; the message names the file and the line."""
+
+
+def read_grids(theme: str, palette: dict[str, str]) -> dict[str, list[Frame]]:
+    """Reads a redrawn character's frames from tools/art/<theme>/<phase>.txt.
+
+    Each file holds the phase's frames in order: blocks of equal rows, one palette letter per
+    cell, separated by exactly one empty line, ending with a newline.
 
     Args:
-        mood: "relaxed", "tense" or "angry".
-        variant: The animation frame of that mood.
+        theme: The character's folder name under tools/art/.
+        palette: Its palette; every letter in a grid must be a key.
 
     Returns:
-        The frame as text rows.
+        Each phase's frames.
+
+    Raises:
+        GridError: A missing file, a file that is not UTF-8, no final newline, a stray blank
+            line, trailing spaces, an unknown letter, unequal rows or frame sizes (within a
+            phase or across phases), more than MAX_CELLS cells a side or more than MAX_FRAMES
+            frames in a phase.
     """
-    g = blank()
-    angry = mood == "angry"
-    skin, shade = ("z", "Z") if angry else ("s", "S")
-    # helmet
-    put(g, [(x, 1) for x in range(4, 12)], "k")
-    put(g, [(3, 2), (12, 2)], "k"); rect(g, 4, 2, 11, 2, "h")
-    put(g, [(2, 3), (13, 3), (2, 4), (13, 4)], "k"); rect(g, 3, 3, 12, 4, "h")
-    rect(g, 5, 2, 8, 2, "H"); rect(g, 4, 3, 6, 3, "H")
-    put(g, [(2, 5), (13, 5)], "k"); rect(g, 3, 5, 12, 5, "g")
-    # face
-    for y in range(6, 13):
-        put(g, [(2, y), (13, y)], "k"); rect(g, 3, y, 12, y, skin)
-    put(g, [(3, 13), (12, 13)], "k"); rect(g, 4, 13, 11, 13, skin)
-    rect(g, 4, 14, 11, 14, "k")
-    for y in range(8, 13):
-        put(g, [(3, y), (12, y)], shade)
-    put(g, [(7, 10), (8, 10)], shade)  # nose
+    phases: dict[str, list[Frame]] = {}
+    size: tuple[int, int] | None = None
+    for phase in PHASES:
+        path = os.path.join(ART_DIR, theme, phase + ".txt")
+        where = os.path.relpath(path, os.path.join(ART_DIR, "..", ".."))
+        if not os.path.isfile(path):
+            raise GridError(f"{where}: missing")
+        with open(path, "rb") as f:
+            raw = f.read()
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise GridError(f"{where}: not UTF-8 at byte {e.start}") from None
+        if not text.endswith("\n"):
+            raise GridError(f"{where}: no final newline")
+        frames: list[Frame] = [[]]
+        for n, line in enumerate(text[:-1].split("\n"), 1):
+            if line == "":
+                if not frames[-1]:
+                    raise GridError(f"{where}:{n}: blank line other than one separator")
+                frames.append([])
+                continue
+            if line != line.rstrip():
+                raise GridError(f"{where}:{n}: trailing spaces")
+            bad = sorted(set(line) - set(palette))
+            if bad:
+                raise GridError(f"{where}:{n}: letter {bad[0]!r} not in the palette")
+            if len(line) > MAX_CELLS:
+                raise GridError(f"{where}:{n}: {len(line)} cells wide, at most {MAX_CELLS}")
+            if frames[-1] and len(line) != len(frames[-1][0]):
+                raise GridError(f"{where}:{n}: row of {len(line)} cells, the frame's are {len(frames[-1][0])}")
+            frames[-1].append(line)
+            if len(frames[-1]) > MAX_CELLS:
+                raise GridError(f"{where}:{n}: frame taller than {MAX_CELLS} rows")
+        if not frames[-1]:
+            raise GridError(f"{where}: ends with a blank line")
+        if len(frames) > MAX_FRAMES:
+            raise GridError(f"{where}: {len(frames)} frames, at most {MAX_FRAMES}")
+        for i, frame in enumerate(frames):
+            here = (len(frame[0]), len(frame))
+            if size is None:
+                size = here
+            elif here != size:
+                raise GridError(f"{where}: frame {i} is {here[0]}x{here[1]}, the others {size[0]}x{size[1]}")
+        phases[phase] = frames
+    return phases
 
-    if mood == "relaxed":
-        rect(g, 4, 6, 6, 6, "k"); rect(g, 9, 6, 11, 6, "k")  # flat brows
-        rect(g, 4, 7, 6, 8, "w"); rect(g, 9, 7, 11, 8, "w")
-        put(g, [(5, 7), (5, 8), (10, 7), (10, 8)], "k")
-        put(g, [(5, 11), (10, 11)], "m"); rect(g, 6, 12, 9, 12, "m")  # smile
-    elif mood == "tense":
-        put(g, [(4, 5), (5, 5), (6, 5), (9, 5), (10, 5), (11, 5)], "k")  # raised brows
-        rect(g, 4, 6, 6, 8, "w"); rect(g, 9, 6, 11, 8, "w")
-        px = 4 if variant == 0 else 6
-        px2 = px + 5
-        put(g, [(px, 7), (px, 8), (px2, 7), (px2, 8)], "k")
-        rect(g, 6, 12, 9, 12, "m")  # flat mouth
-        dy = 0 if variant == 0 else 1  # the sweat drop slides down
-        put(g, [(14, 5 + dy), (14, 6 + dy), (14, 7 + dy), (15, 7 + dy)], "b")
-    else:
-        put(g, [(4, 6), (5, 6), (6, 7), (11, 6), (10, 6), (9, 7)], "k")  # slanted brows
-        rect(g, 4, 8, 6, 8, "w"); rect(g, 9, 8, 11, 8, "w")
-        put(g, [(5, 8), (10, 8)], "r")  # glowing pupils
-        if variant == 1:  # shouting: two fangs hang from the top lip, tongue below
-            rect(g, 5, 10, 10, 13, "k")
-            put(g, [(6, 11), (9, 11)], "t"); rect(g, 7, 11, 8, 11, "m")
-            rect(g, 6, 12, 9, 12, "m"); rect(g, 7, 12, 8, 12, "r")
-        else:  # grimace: gritted teeth, each one set apart by a dark gap
-            rect(g, 5, 11, 10, 11, "k")
-            put(g, [(5, 12), (7, 12), (8, 12), (10, 12)], "t"); put(g, [(6, 12), (9, 12)], "k")
-            rect(g, 5, 13, 10, 13, "k")
-        if variant != 2:  # anger mark, pulsing
-            put(g, [(13, 0), (15, 0), (14, 1), (13, 2), (15, 2)], "r")
-    return rows(g)
 
+try:
+    MARINE_FRAMES = read_grids("marine", MARINE_PALETTE)
+except GridError as e:
+    sys.exit(f"draw-themes: {e}")
 
 MARINE: Theme = {
     "progress": False,
-    "palette": {
-        ".": "transparent", "k": "#1b1511", "h": "#55703c", "H": "#7c9a58", "g": "#3c5230",
-        "s": "#d9a273", "S": "#b98456", "z": "#d9694a", "Z": "#b4503a", "w": "#f4efe6",
-        "t": "#f4efe6", "m": "#8a3b34", "r": "urgent", "b": "accent",
-    },
+    "palette": MARINE_PALETTE,
     "phases": {
-        "relaxed": {"color": "accent", "caption": "All clear.", "frames": [marine("relaxed")]},
-        "tense": {"caption": "Incoming.", "frameMs": 900, "frames": [marine("tense", 0), marine("tense", 1)]},
-        "angry": {"color": "urgent", "caption": "YOU ARE LATE.", "frameMs": 250, "shake": True,
-                  "frames": [marine("angry", 0), marine("angry", 1), marine("angry", 2)]},
+        "relaxed": {"color": "accent", "caption": "All clear.", "frames": MARINE_FRAMES["relaxed"]},
+        # a standoff: the bust, one held close-up on entering the phase, then the bust in a loop
+        "tense": {"caption": "Incoming.", "frameMs": 900, "loopFrom": 8, "frames": MARINE_FRAMES["tense"]},
+        # ignition once, then a loop: a burst of laughter (the jolt lands on it), then the furious face burning
+        "angry": {"color": "urgent", "caption": "YOU ARE LATE.", "frameMs": 120, "shake": True, "loopFrom": 10,
+                  "frames": MARINE_FRAMES["angry"]},
     },
 }
 

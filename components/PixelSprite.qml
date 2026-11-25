@@ -4,14 +4,15 @@ import QtQuick
 import qs.Commons
 
 /**
- * Draws one frame of pixel art. Every cell is a whole-pixel square with no smoothing, so the
- * art stays crisp.
+ * Draws one frame of pixel art on one Canvas. Every cell is a whole-pixel square with no
+ * smoothing, so the art stays crisp. A run of same-colored cells in a row is one `fillRect`:
+ * a 40x40 frame is a few hundred rectangles painted in one pass, not 1600 items to update.
  *
  * In: `grid`, a list of equal-length text rows; `colors`, each character to a color token (an
  * Omarchy role or hex); `cols`, `rows`; `cell`, the size of one pixel.
  * Out: nothing; it only draws.
  */
-Item {
+Canvas {
   id: px
 
   property int cols: 0
@@ -19,28 +20,41 @@ Item {
   property var colors: ({})
   property var grid: []
   property int cell: 6
+  // Each character to its color. Tokens resolve in this binding, which reads the shell theme,
+  // so role colors follow the theme as it changes and the frame repaints.
+  readonly property var resolved: {
+    const m = {}
+    for (const k in px.colors) m[k] = Color.flatColor(px.colors[k], "transparent")
+    return m
+  }
 
   width: px.cols * px.cell
   height: px.rows * px.cell
+  antialiasing: false
+  smooth: false
 
-  Repeater {
-    model: px.cols * px.rows
+  onGridChanged: px.requestPaint()
+  onResolvedChanged: px.requestPaint()
+  onWidthChanged: px.requestPaint()
+  onHeightChanged: px.requestPaint()
 
-    Rectangle {
-      id: pixel
-
-      required property int index
-      x: (pixel.index % px.cols) * px.cell
-      y: Math.floor(pixel.index / px.cols) * px.cell
-      width: px.cell
-      height: px.cell
-      antialiasing: false
-      // Characters `colors` does not know are transparent. Tokens resolve
-      // here, so role colors follow the shell theme as it changes.
-      color: {
-        var row = px.grid[Math.floor(pixel.index / px.cols)]
-        var token = row ? px.colors[row.charAt(pixel.index % px.cols)] : undefined
-        return token ? Color.flatColor(token, "transparent") : "transparent"
+  // Characters `colors` does not know are left transparent.
+  onPaint: {
+    const ctx = px.getContext("2d")
+    ctx.clearRect(0, 0, px.width, px.height)
+    for (let y = 0; y < px.rows; y++) {
+      const row = px.grid[y] || ""
+      let x = 0
+      while (x < px.cols) {
+        const ch = row.charAt(x)
+        let end = x + 1
+        while (end < px.cols && row.charAt(end) === ch) end++
+        const c = px.resolved[ch]
+        if (c) {
+          ctx.fillStyle = c
+          ctx.fillRect(x * px.cell, y * px.cell, (end - x) * px.cell, px.cell)
+        }
+        x = end
       }
     }
   }

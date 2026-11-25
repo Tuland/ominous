@@ -6,7 +6,25 @@ All notable changes to Ominous are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `loopFrom` in a theme phase: the frames before it play once as an intro, then the rest loop.
+  In angry with `shake`, the jolt comes when the loop starts. See
+  [making a theme](docs/custom-themes.md).
+
+### Changed
+- The `marine` is redrawn: a 40x40 bust of a helmeted soldier in olive gear. Tense is a standoff
+  with darting eyes, a sweat drop and one close-up on his stare; angry ignites (his eyes catch
+  fire, flames and sparks rise around him) and then alternates a short laugh with a longer
+  furious burn.
+- Sprites can be up to 40x40 cells (was 32x32). Each cell is now 5 screen pixels at the default
+  scale (was 7), so `shiba`, `boss` and user themes are drawn smaller until they are redrawn.
+- The sprite is centred on the card's text, from the title to the caption, and the card grows
+  taller when the sprite needs it.
+- The caption is drawn in the card's text color, no longer in the phase color.
+
 ### Fixed
+- A user theme with an empty frame list in one phase lost its whole sprite on the card; now only
+  that phase has no sprite.
 - The card vanished, while still counted open, when its monitor was unplugged: it now moves to
   the focused monitor and stays there when the monitor returns. A card is also no longer lost
   when the focused monitor cannot be matched as it opens.

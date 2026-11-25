@@ -82,8 +82,15 @@ Item {
   readonly property color textColor: Color.notifications.text
   readonly property color mutedColor: Util.alpha(root.textColor, 0.6)
   readonly property int hero: Style.font.displayLarge
-  readonly property int cell: Math.max(3, Math.round(Style.space(7)))
+  readonly property int cell: Math.max(3, Math.round(Style.space(5)))
   // Width the sprite takes from the card: it grows by this much, the text column keeps its size.
+  // The countdown's descent that its letters never reach in this phase (Logic.unusedDescent):
+  // taken off the countdown and given to the gap before the buttons, so the line under the
+  // countdown sits close to the digits and the card keeps its height.
+  readonly property real countdownSlack: {
+    var ink = countdownMetrics.tightBoundingRect(Logic.countdownSample(root.started))
+    return Logic.unusedDescent(countdownMetrics.descent, ink.y + ink.height)
+  }
   property real spriteReserve: sprite.hasArt ? root.theme.cols * root.cell + Style.space(24) : 0
   Behavior on spriteReserve { enabled: root.opened; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
@@ -138,10 +145,13 @@ Item {
     root.openedAtMs = root.nowMs
     root.closesAtMs = p.notice && p.notice.closeInSeconds > 0 ? root.openedAtMs + p.notice.closeInSeconds * 1000 : 0
     root.guardKeyMs = 0
-    sprite.reset()
+    // A card that is already open only takes the new details (Service follows its meeting):
+    // its animation goes on, with no new intro and no new jolt.
+    var arriving = !root.opened
+    if (arriving) sprite.reset()
     root.opened = true
     // An alert that opens late is already angry: it jolts on arrival too.
-    sprite.maybeShake()
+    if (arriving) sprite.maybeShake()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -205,9 +215,10 @@ Item {
     else root.dismiss()
   }
 
-  /** Restyles the open card at once and remembers the choice for later alerts. */
+  /** Restyles the open card at once, replays the character's intro, and remembers the choice for later alerts. */
   function toggleMode(): void {
     root.mode = root.mode === "playful" ? "professional" : "playful"
+    sprite.reset()
     saveDir.running = true
   }
 
@@ -281,7 +292,9 @@ Item {
       // The text column is always `textWidth` wide; a sprite adds its reserve on top.
       readonly property real textWidth: Math.min(Style.space(560), panel.width - Style.gapsOut * 8)
       width: Math.min(card.textWidth + root.spriteReserve, panel.width - Style.gapsOut * 8)
-      height: content.implicitHeight + card.contentTopInset + card.contentBottomInset
+      // Tall enough for the text column and for the sprite beside it, whichever reaches lower.
+      height: Math.max(content.implicitHeight, sprite.hasArt ? sprite.y + sprite.height - content.y : 0)
+              + card.contentTopInset + card.contentBottomInset
       // Whole pixels, so the sprite's cells never straddle two screen pixels.
       x: Math.round((panel.width - card.width) / 2)
       y: Math.round((panel.height - card.height) / 2)
@@ -328,11 +341,18 @@ Item {
       PhaseSprite {
         id: sprite
         x: Math.round(card.contentLeftInset)
-        y: Math.round(content.y + titleText.y)
+        // Centred on the text from the title to the last line before the buttons (Logic.spriteTop).
+        y: content.y + Logic.spriteTop(titleText.y + titleText.topPadding, buttonsGap.y, sprite.height, 0)
         theme: root.theme
         phase: root.phase
         running: root.opened
         cell: root.cell
+      }
+
+      // The countdown's font, measured for countdownSlack.
+      FontMetrics {
+        id: countdownMetrics
+        font: countdownText.font
       }
 
       Column {
@@ -340,7 +360,8 @@ Item {
         x: card.contentLeftInset + root.spriteReserve
         y: card.contentTopInset
         width: card.width - card.contentLeftInset - card.contentRightInset - root.spriteReserve
-        spacing: Style.space(10)
+        // Grouped rhythm: each line carries the gap above it, so a hidden line takes its gap along.
+        spacing: 0
 
         Item {
           width: parent.width
@@ -379,6 +400,7 @@ Item {
         Text {
           id: titleText
           width: parent.width
+          topPadding: Style.space(10)
           text: root.title
           textFormat: Text.PlainText
           color: root.textColor
@@ -393,6 +415,7 @@ Item {
 
         Text {
           width: parent.width
+          topPadding: Style.space(6)
           text: root.formatTime(root.startMs) + (root.endMs > 0 ? " – " + root.formatTime(root.endMs) : "")
                 + (root.location ? "   " + root.location : "")
           textFormat: Text.PlainText
@@ -405,9 +428,10 @@ Item {
         }
 
         Text {
+          id: countdownText
           width: parent.width
-          topPadding: Style.space(8)
-          bottomPadding: Style.space(8)
+          height: countdownText.implicitHeight - root.countdownSlack
+          topPadding: Style.space(16)
           text: Logic.countdown(root.startMs, root.nowMs)
           textFormat: Text.PlainText
           color: root.signalColor
@@ -425,6 +449,7 @@ Item {
         Text {
           visible: root.notice !== null
           width: parent.width
+          topPadding: Style.space(4)
           text: Logic.noticeText(root.notice, root.nowMs, root.closesAtMs)
           textFormat: Text.PlainText
           color: root.signalColor
@@ -440,14 +465,23 @@ Item {
         Text {
           visible: root.phaseSpec.caption !== ""
           width: parent.width
+          topPadding: Style.space(4)
           text: root.phaseSpec.caption
           textFormat: Text.PlainText
-          color: root.signalColor
+          // The text color: the phase color stays on the countdown, the notice and the buttons.
+          color: root.textColor
           font.family: Style.font.family
           font.pixelSize: Style.font.title
           maximumLineCount: 1
           elide: Text.ElideRight
           clip: true
+        }
+
+        // The gap before the buttons; its top is also where the sprite's text band ends.
+        Item {
+          id: buttonsGap
+          width: 1
+          height: Style.space(18) + root.countdownSlack
         }
 
         Row {
@@ -488,6 +522,7 @@ Item {
 
         Text {
           width: parent.width
+          topPadding: Style.space(6)
           elide: Text.ElideRight
           text: (root.url !== "" ? "← →  choose    " : "") + "Enter  confirm    Esc  dismiss    M  mode"
           textFormat: Text.PlainText

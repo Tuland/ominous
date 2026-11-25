@@ -34,6 +34,21 @@ describe("phases", () => {
   })
 })
 
+describe("room under the countdown", () => {
+  test("the sample has the letters of its phase", () => {
+    assert.equal(L.countdownSample(false), "in 0:01")
+    assert.equal(L.countdownSample(true), "started 0:01 ago")
+  })
+
+  test("only the descent the ink does not reach is free", () => {
+    assert.equal(L.unusedDescent(16.8, 0.56), 16)                                            // digits: almost all of it
+    assert.equal(L.unusedDescent(16.8, 10.1), 6)                                             // the g of "ago" keeps its room
+    assert.equal(L.unusedDescent(16.8, -3), 16)                                              // ink above the line
+    assert.equal(L.unusedDescent(16.8, 20), 0)                                               // ink below the descent
+    assert.equal(L.unusedDescent(0, 0), 0)
+  })
+})
+
 describe("the card's input rules", () => {
   test("input is swallowed for the first second only", () => {
     assert.equal(L.isGuarded(now, 0, now, 1000), true)

@@ -11,8 +11,9 @@ writes `themes/<name>.json`. A user's own theme is a JSON file in
 `~/.config/omarchy/ominous/themes/` (format: `docs/custom-themes.md`). Never edit a shipped
 theme's JSON by hand: `tests/run.sh` fails when it differs from the script.
 
-Today `marine`, `shiba` and `boss` are 16x16 and drawn as coordinates in `tools/draw-themes.py`
-(`tests/themes.test.mjs` checks the size). Each is being redrawn, one change at a time, from
+`marine` is 40x40 and drawn from text grids in `tools/art/marine/`, the first character
+redrawn. `shiba` and `boss` are still 16x16 and drawn as coordinates in `tools/draw-themes.py`
+(`tests/themes.test.mjs` checks the sizes). Each is being redrawn, one change at a time, from
 reference images through drafts into text grids (see "Redrawing a character"). Until a
 character is redrawn, small fixes to it stay in the coordinate code.
 
@@ -23,9 +24,13 @@ go step by step, show every step as a picture and check it with the user. Get it
 `mise run setup` (it lands in `.claude/skills/codixel/`, which git ignores; the plugin never
 ships it). Where codixel and this skill disagree, this skill wins:
 
-- **References:** only CC0, public domain, or made by the user. Not CC BY, not CC BY-SA, never
-  a recognizable person. Someone else's artwork is never used, whatever is decided in the
-  moment.
+- **References:** only CC0, public domain, or made by the user (an own photo or an image they
+  generated). Not CC BY, not CC BY-SA. References stay in `drafts/` and may show real people;
+  the shipped art never resembles a recognizable person, character or mascot. Someone else's
+  artwork is never used, whatever is decided in the moment.
+- **Generated references:** ask for flat frontal light and a flat, saturated background (pure
+  blue works), and key the background out by color (`P.removeBg`). Shadows and rim light turn
+  into stray stripes once pixelated.
 - **No web search for reference photos** unless the user asks for one; then only the licenses
   above. Local conversion tools (ImageMagick, ffmpeg, PIL) are fine.
 - **Files are written only in `drafts/<theme>/`**: every `P.load`, `P.save` and `P.gif` path
@@ -40,20 +45,28 @@ ships it). Where codixel and this skill disagree, this skill wins:
 ## Rules for the character
 
 - **Original.** Built-in art uses no third-party artwork: no sprite, mascot, character,
-  illustration or frame by someone else, traced or copied. A reference photo (licenses above)
-  may be pixelated as a starting point in `drafts/`; the shipped frames are redrawn by hand in
-  the theme's palette, with their own outline, expressions and animation. A pixelated photo is
-  never a shipped frame. Genre archetypes are fine (a square jaw, a buzz cut, a helmet); a
+  illustration or frame by someone else, traced or copied. A third-party reference (licenses
+  above) may be pixelated in `drafts/` as a guide, but its pixelation is never a shipped frame:
+  the frames are redrawn by hand in the theme's palette, with their own outline, expressions and
+  animation. A reference the user made (own photo or generated image) may be pixelated into the
+  shipped frames: reduced to the theme's palette, outlined, and fixed by hand where it has a
+  defect. Effects (fire, sparks, steam) are built in code (codixel, section 4), never pixelated
+  from a picture. Genre archetypes are fine (a square jaw, a buzz cut, a helmet); a
   specific character, mascot or person is not. Do not use a trademark in the theme name, the
   file name or the captions (e.g. `marine`, not `doom`). A nod in `docs/themes.md` is fine, and
   the source URL of every reference behind shipped art goes in its References section.
-- **Size:** up to 32x32 cells and 64 frames per phase (the spec limit;
+- **Size:** up to 40x40 cells and 64 frames per phase (the spec limit;
   `openspec/specs/alert-themes/spec.md`, "Pixel-art sprites"), one face or a bust (`boss` has
   collar and tie). Every frame of every phase has the same size. The card shows each cell as a
-  whole-pixel square, 7 screen pixels at the default scale.
-- **Animation grows with urgency:** relaxed is one still frame; tense has 2 slow frames
-  (`frameMs` ~900: eyes dart, a sweat drop slides); angry has fast frames (`frameMs` ~250) and
-  `"shake": true`.
+  whole-pixel square, 5 screen pixels at the default scale (a 40x40 bust is 200 pixels).
+- **Style:** decided with the user for each character, in its own change. The marine keeps the
+  realistic shading of its reference (a cartoon pass was rejected); that does not decide the
+  others.
+- **Animation grows with urgency:** relaxed is one still frame; tense has a few slow frames
+  (`frameMs` ~900: eyes dart, a sweat drop slides); angry has fast frames (`frameMs` 120-250)
+  and `"shake": true`. `loopFrom` makes the frames before it an intro that plays once, then the
+  rest loops (the marine ignites, then burns); in angry with `shake`, the jolt lands at the loop
+  start instead of the phase start.
 - **Captions:** one ironic line per phase, 80 characters at most, in the character's voice.
 - **Colors:** use roles where the color should follow the Omarchy theme: `urgent` for anger
   marks and glowing eyes, `accent` for a sweat drop or a tie, `muted` for steam. Use hex for skin,
@@ -75,15 +88,23 @@ ships it). Where codixel and this skill disagree, this skill wins:
   blend.
 - Fire is a material, like skin: a few hand-picked hex tones (deep red, orange, yellow, a pale
   yellow core, never white), not `urgent`, so it burns the same under every Omarchy theme.
+- Fire pixelated from a picture comes out pale and flat. Build it in code: a value per cell from
+  the shape (distance to the silhouette) plus rising loop noise, cut into flat bands of those
+  tones, with sparks whose life divides the loop length so the loop closes without a seam.
+- Mirroring part of a face to move the eyes shifts skin cells and leaves stray pixels. Take the
+  changed cells from a second reference with the eyes turned instead, and only those.
 
 ## Redrawing a character
 
 1. **References.** Agree with the user on 2-3 reference images (licenses above) and keep them
    in `drafts/<theme>/` with their source URLs.
-2. **Drafts.** Work in `drafts/<theme>/` with codixel: pixelate, then redraw by hand. Show
-   candidates side by side on one PNG sheet per question (e.g. two sizes, or three mouths), read
-   the sheet as an image, and let the user keep or drop each idea. Short rounds. Nothing here
-   summons the card.
+2. **Drafts.** Work in `drafts/<theme>/` with codixel: pixelate, then redraw by hand (or, for a
+   reference the user made, keep the pixelation and fix its defects by hand). Show candidates
+   side by side on one PNG sheet per question (e.g. two sizes, or three mouths), read the sheet
+   as an image, and let the user keep or drop each idea. Short rounds: change one thing per
+   sheet, always next to the accepted version, and never touch what the user did not name.
+   Number the sheets in creation order (`001-grid-choice.png`, `002-...`). Nothing here summons
+   the card.
 3. **Export.** When a direction is chosen, a draft script writes the frames as text grids; never
    retype a grid from a picture. The contract:
    - path `tools/art/<theme>/<phase>.txt`, one file per phase;
@@ -95,9 +116,9 @@ ships it). Where codixel and this skill disagree, this skill wins:
      distinct RGB. A role letter (`accent`, `urgent`, ...) uses a fixed stand-in RGB chosen in
      the draft, not the live theme color.
 
-   `tools/draw-themes.py` will read the grids (the reader comes with the first redrawn
-   character; until then nothing reads them) and keeps owning the palette, captions, `frameMs`,
-   `shake` and the JSON.
+   `tools/draw-themes.py` reads the grids (`read_grids`, which stops on a grid that breaks the
+   contract, naming the file and line) and keeps owning the palette, captions, `frameMs`,
+   `loopFrom`, `shake` and the JSON.
 4. Then the checks in "Workflow" below, from step 2.
 
 ## Workflow

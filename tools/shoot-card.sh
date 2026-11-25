@@ -20,7 +20,9 @@
 # the card reaches an edge of the monitor (a veil not yet opaque leaves the whole screen): the
 # card must be the centred, only thing on it.
 # Saved choices (state.json, themes.json) are not touched. Needs the running shell, grim and
-# ImageMagick.
+# ImageMagick. OMINOUS_SHOOT_WAIT sets the seconds between summoning the card and the capture
+# (1.6 by default), to catch another frame of an animation; too short a wait is refused while
+# the veil is still fading in.
 
 set -u
 cd "$(dirname "$0")/.." || exit 2
@@ -154,7 +156,7 @@ for try in 1 2 3; do
   for _ in $(seq 25); do card_on_output || break; sleep 0.2; done
   if card_on_output; then echo "a card already on $output does not close" >&2; exit 1; fi
   omarchy-shell shell summon "$ID" "$payload" >/dev/null
-  sleep 1.6
+  sleep "${OMINOUS_SHOOT_WAIT:-1.6}"
   if ! card_on_output; then
     omarchy-shell -q shell hide "$ID"
     echo "the card is not on $output (try $try of 3)" >&2

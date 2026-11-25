@@ -34,12 +34,13 @@ generator), `qmllint` (Qt 6, at `/usr/lib/qt6/bin/qmllint`), `shellcheck`, `tsc`
 | `components/` | QML pieces with explicit properties in and signals out: `ActionButton`, `ModeSwitch`, `LinkNotice`, `ProgressLine`, `PixelSprite`, `PhaseSprite`, `ThemeSlot`, `ThemeFile`. |
 | `themes/` | The shipped themes. |
 | `tools/draw-themes.py` | Draws the shipped characters and writes their JSON. |
+| `tools/art/<theme>/` | The text grids of a redrawn character, one `<phase>.txt` per phase, read by `tools/draw-themes.py` (today `marine`). |
 | `tools/setup-dev.sh` | Fetches the development-only third-party tools (`mise run setup`). |
 | `.claude/skills/codixel/`, `drafts/` | Ignored by git: the fetched pixel-art skill, and the drafts made while exploring new art (reference images, draft scripts, comparison sheets). A unit test checks that both stay ignored. |
 | `tools/make-config-docs.mjs` | Writes `docs/ominous.example.jsonc` and `docs/ominous.schema.json` from the config declaration in `Logic.js` (`--check` only compares); a unit test fails when they are stale. |
 | `.githooks/pre-push` | The pre-push hook: runs the unit checks before every push except a deletion. |
 | `tools/lint.sh` | Static checks: `qmllint` on the QML, `shellcheck` on the scripts, `tsc` on the JSDoc types of `Logic.js`, `mypy` on the Python. |
-| `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. Holds real alerts while it runs (`hold`) and stops if a card is already on screen; `make-preview.sh` and `theme-check.sh` hold them for their whole run. |
+| `tools/shoot-card.sh` | Photographs one theme in one phase: a synthetic card on an opaque veil, never the desktop. Holds real alerts while it runs (`hold`) and stops if a card is already on screen; `make-preview.sh` and `theme-check.sh` hold them for their whole run. `OMINOUS_SHOOT_WAIT=<seconds>` waits longer (or shorter) than the default 1.6 s before the capture, to catch another frame of an animation. |
 | `tools/make-preview.sh`, `preview.png` | The marketplace picture and the script that makes it (from `shoot-card.sh`). |
 | `.claude/skills/ominous-theme/` | The agent skill for drawing and reviewing characters. |
 | `.agents/skills/` | The OpenSpec skills. `openspec update` links them into `.claude/skills/openspec-*`; git ignores the links, because the marketplace refuses a plugin folder that holds a symlink (a unit test checks that git tracks none). |
@@ -152,7 +153,7 @@ meeting's title, place, calendar name and link. Reviews look at that path at thr
 | Keys while the card opens | Joining or dismissing | Input is ignored for a second after the card opens or moves to another monitor, and after every key pressed while ignored, decided at the moment of the input (`Logic.isGuarded`) | `tests/card.test.mjs`, `tests/style.test.mjs` (every input handler of `Alert.qml` asks `guardedNow()`), `tests/live.sh` (keys) |
 | IPC payload (`summon`, same user) | The overlay | `Logic.normalizePayload` checks every field again with the config's ranges (`dim` 0 to 1, seconds 0 to 3600), `joinHosts` included; the `notice` passes only with a known kind and known field names, a countdown of 1 to 60 whole seconds and a moved-to time a `Date` holds (`Logic.normalizeNotice`), and its line is built from a fixed vocabulary, never from payload text (`Logic.noticeText`) | `tests/payload.test.mjs` |
 | `ominous.json`, `state.json`, `themes.json` | Behavior and theme file names | `Logic.checkConfig` (a refused value falls back to its default and is reported in `ignoredValues`), `Logic.resolveMode`; a theme name is a slug (`Logic.isThemeName`), never a path | `tests/config.test.mjs` |
-| User theme files | Colors, caption and sprite | `Logic.normalizeTheme`: colors only (at most 40 characters), captions one cleaned line of 80 characters (`Logic.cleanText`) drawn clipped, sprites at most 32x32 cells and 64 frames per phase | `tests/themes.test.mjs` |
+| User theme files | Colors, caption and sprite | `Logic.normalizeTheme`: colors only (at most 40 characters), captions one cleaned line of 80 characters (`Logic.cleanText`) drawn clipped, sprites at most 40x40 cells and 64 frames per phase, `loopFrom` a whole frame index or 0 | `tests/themes.test.mjs` |
 | Long text from a calendar | The card's size | Elided or capped (title lines, captions, sprite size) | `tests/live.sh` (long title) |
 
 The browser is started by `omarchy-launch-browser`. Since Omarchy 4.5 it first tries
@@ -223,12 +224,14 @@ tests that hold each rule, then update the map. A finding that is not fixed stop
 `marine`, `shiba` and `boss` are drawn in `tools/draw-themes.py`. Change the art there and
 rerun it; never edit their JSON by hand, because `tests/run.sh` fails when the two differ.
 
-Today the three are drawn as coordinates in the script. A character being redrawn goes through
-drafts instead: reference images (CC0, public domain or own) and draft scripts using codixel
-(`mise run setup`) in `drafts/`, candidates compared on PNG sheets, then the chosen frames
-exported as text grids to `tools/art/<theme>/<phase>.txt` (rows of palette letters, frames
-separated by one empty line). That is the contract the first redrawn character implements,
-together with the reader in the script; until then nothing reads `tools/art/`. The
+`shiba` and `boss` are still drawn as coordinates in the script. A redrawn character goes
+through drafts instead: reference images (CC0, public domain or own) and draft scripts using
+codixel (`mise run setup`) in `drafts/`, candidates compared on PNG sheets, then the chosen
+frames exported as text grids to `tools/art/<theme>/<phase>.txt` (rows of palette letters,
+frames separated by one empty line). The `marine` is the first: the script reads its grids
+from `tools/art/marine/` (`read_grids`) and keeps its palette, captions, timings and `shake`.
+A grid that breaks the contract (an unknown letter, a short row, trailing spaces, a size over
+40x40 or 64 frames) stops the script with its file and line. The
 [ominous-theme skill](../.claude/skills/ominous-theme/SKILL.md) has the rules and the steps.
 
 ```bash

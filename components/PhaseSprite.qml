@@ -2,9 +2,11 @@ import QtQuick
 import "../Logic.js" as Logic
 
 /**
- * A theme's character for the current phase: cycles the phase's frames, jolts once when the
- * meeting starts (if the theme asks), and fades out when the phase has no art, still showing
- * its last frame instead of vanishing mid-fade.
+ * A theme's character for the current phase: plays the phase's frames (an intro once, then the
+ * loop from `loopFrom`), jolts once when the meeting starts or, with an intro, when the loop
+ * starts (if the theme asks), and fades out when the phase has no art, still showing its last
+ * frame instead of vanishing mid-fade. A theme object that draws the same art (an open card's
+ * update) keeps the animation where it is.
  *
  * In: `theme` (normalized), `phase`, `running` (the card is open), `cell` (pixel size).
  * Out: `hasArt`, for the card to make room; reset() and maybeShake() for the card to call.
@@ -24,13 +26,18 @@ Item {
   property real shakeX: 0
   readonly property var rows: sprite.hasArt ? Logic.frameAt(sprite.spec.frames, sprite.frameIndex) : null
   property var shown: ({ cols: 0, rows: 0, palette: ({}), grid: [] })
+  // The theme shown before the last change, to tell new art from a fresh copy of the same.
+  property var previousTheme: null
 
   width: sprite.theme.cols * sprite.cell
   height: sprite.theme.rows * sprite.cell
 
   onRowsChanged: if (sprite.rows) sprite.shown = { cols: sprite.theme.cols, rows: sprite.theme.rows, palette: sprite.theme.palette, grid: sprite.rows }
   onPhaseChanged: { sprite.frameIndex = 0; sprite.maybeShake() }
-  onThemeChanged: sprite.frameIndex = 0
+  onThemeChanged: {
+    if (!Logic.sameArt(sprite.previousTheme, sprite.theme)) sprite.frameIndex = 0
+    sprite.previousTheme = sprite.theme
+  }
 
   /** For a card that just opened: start from the first frame, no leftover jolt. */
   function reset(): void {
@@ -39,9 +46,16 @@ Item {
     sprite.frameIndex = 0
   }
 
-  /** Jolts once, if the card is open, angry, and the theme asks for it. */
+  /** Jolts once on showing the phase, if the card is open and the phase asks for it (Logic.joltOnEnter). */
   function maybeShake(): void {
-    if (sprite.running && sprite.phase === "angry" && sprite.hasArt && sprite.spec.shake) shake.restart()
+    if (sprite.running && sprite.hasArt && Logic.joltOnEnter(sprite.phase, sprite.spec)) shake.restart()
+  }
+
+  /** Moves to the next frame, jolting when an intro hands over to its loop (Logic.joltOnStep). */
+  function step(): void {
+    var from = sprite.frameIndex
+    sprite.frameIndex = Logic.nextFrame(from, sprite.spec.frames.length, sprite.spec.loopFrom)
+    if (Logic.joltOnStep(sprite.phase, sprite.spec, from, sprite.frameIndex)) shake.restart()
   }
 
   // One sideways jolt: four 40 ms steps of one cell.
@@ -57,7 +71,7 @@ Item {
     interval: sprite.spec.frameMs
     running: sprite.running && sprite.hasArt && sprite.spec.frames.length > 1
     repeat: true
-    onTriggered: sprite.frameIndex = (sprite.frameIndex + 1) % sprite.spec.frames.length
+    onTriggered: sprite.step()
   }
 
   PixelSprite {

@@ -70,12 +70,11 @@ describe("theme files", () => {
       ["frame sizes differ", (c) => { c.phases.tense.frames[1] = ["kkk", "ooo"] }],
       ["frame heights differ", (c) => { c.phases.tense.frames[1] = ["kk"] }],
       ["row lengths differ", (c) => { c.phases.relaxed.frames[0] = ["kk", "o"] }],
-      ["too wide", (c) => { for (const p of ["relaxed", "tense", "angry"]) c.phases[p].frames = [["k".repeat(33)]] }],
-      ["too tall", (c) => { for (const p of ["relaxed", "tense", "angry"]) c.phases[p].frames = [Array(33).fill("kk")] }],
+      ["too wide", (c) => { for (const p of ["relaxed", "tense", "angry"]) c.phases[p].frames = [["k".repeat(41)]] }],
+      ["too tall", (c) => { for (const p of ["relaxed", "tense", "angry"]) c.phases[p].frames = [Array(41).fill("kk")] }],
       ["long palette key", (c) => { c.palette.ab = "accent" }],
       ["empty palette key", (c) => { c.palette[""] = "accent" }],
       ["frames not an array", (c) => { c.phases.relaxed.frames = "kk" }],
-      ["empty frame list", (c) => { c.phases.relaxed.frames = [] }],
       ["row not a string", (c) => { c.phases.relaxed.frames = [[1, 2]] }],
       ["no palette", (c) => { delete c.palette }],
     ]) {
@@ -90,12 +89,94 @@ describe("theme files", () => {
     }
   })
 
+  test("an empty frame list leaves only that phase without a sprite, also after the payload", () => {
+    const t = broken((c) => { c.phases.relaxed.frames = [] })
+    assert.equal(t.cols, 2)
+    assert.equal(t.phases.relaxed.frames.length, 0)
+    assert.equal(t.phases.tense.frames.length, 2)
+    const again = L.normalizeTheme(JSON.parse(JSON.stringify(t)))
+    assert.equal(again.cols, 2)
+    assert.equal(again.phases.relaxed.frames.length, 0)
+    assert.equal(again.phases.tense.frames.length, 2)
+  })
+
   test("odd palette values and partial sprites", () => {
     assert.equal(broken((c) => { c.palette.o = 7 }).cols, 2)                                // not a string: ignored, sprite stays
     assert.equal(broken((c) => { c.palette.o = 7 }).palette.o, undefined)
     const part = broken((c) => { delete c.phases.relaxed.frames })                          // a phase may have no sprite
     assert.equal(part.cols, 2)
     assert.equal(part.phases.relaxed.frames.length, 0)
+  })
+})
+
+describe("sprite size, intro and loop", () => {
+  const square = (n) => Array(n).fill("k".repeat(n))
+  const withFrames = (angry, extra = {}) => L.normalizeTheme({
+    palette: { k: "#000000" },
+    phases: { relaxed: { frames: [angry[0]] }, angry: { shake: true, frames: angry, ...extra } }
+  })
+
+  test("40x40 is the largest sprite", () => {
+    assert.equal(L.normalizeTheme({ palette: { k: "#000000" }, phases: { relaxed: { frames: [square(40)] } } }).cols, 40)
+    assert.equal(L.normalizeTheme({ palette: { k: "#000000" }, phases: { relaxed: { frames: [square(41)] } } }).cols, 0)
+  })
+
+  test("loopFrom is kept only as a whole index below the frame count", () => {
+    const three = [["k"], ["k"], ["k"]]
+    assert.equal(withFrames(three, { loopFrom: 2 }).phases.angry.loopFrom, 2)
+    for (const bad of [3, -1, 1.5, "2", null, true]) assert.equal(withFrames(three, { loopFrom: bad }).phases.angry.loopFrom, 0)
+    assert.equal(withFrames(three).phases.angry.loopFrom, 0)
+    assert.equal(withFrames(three).phases.tense.loopFrom, 0)                                // no frames at all
+  })
+
+  test("loopFrom survives a second normalization, as in the payload", () => {
+    const t = L.normalizeTheme({ palette: { k: "#000000" }, phases: { relaxed: { frames: [["k"]] }, tense: { frames: [["k"]] },
+                                                                     angry: { frames: [["k"], ["k"], ["k"]], loopFrom: 1 } } })
+    assert.equal(L.normalizeTheme(JSON.parse(JSON.stringify(t))).phases.angry.loopFrom, 1)
+  })
+
+  test("an intro plays once, then the loop repeats", () => {
+    const seen = [0]
+    for (let i = 0; i < 10; i++) seen.push(L.nextFrame(seen[seen.length - 1], 7, 4))
+    assert.deepEqual(seen, [0, 1, 2, 3, 4, 5, 6, 4, 5, 6, 4])
+    assert.deepEqual([0, 1, 2].map((i) => L.nextFrame(i, 3, 0)), [1, 2, 0])            // no intro: all loop
+    assert.equal(L.nextFrame(0, 1, 0), 0)
+    assert.equal(L.nextFrame(0, 0, 0), 0)
+  })
+
+  test("the jolt comes on entry without an intro, at the loop start with one", () => {
+    const plain = withFrames([["k"], ["k"]]).phases.angry
+    const intro = withFrames([["k"], ["k"], ["k"], ["k"]], { loopFrom: 2 }).phases.angry
+    assert.equal(L.joltOnEnter("angry", plain), true)
+    assert.equal(L.joltOnEnter("angry", intro), false)
+    assert.equal(L.joltOnEnter("tense", plain), false)
+    assert.equal(L.joltOnEnter("angry", { ...plain, shake: false }), false)
+    assert.equal(L.joltOnStep("angry", intro, 1, 2), true)
+    assert.equal(L.joltOnStep("angry", intro, 3, 2), false)                                 // the loop coming back
+    assert.equal(L.joltOnStep("angry", intro, 0, 1), false)
+    assert.equal(L.joltOnStep("angry", plain, 1, 0), false)
+    assert.equal(L.joltOnStep("tense", intro, 1, 2), false)
+    const lastOnly = withFrames([["k"], ["k"], ["k"]], { loopFrom: 2 }).phases.angry       // a one-frame loop
+    assert.equal(L.joltOnStep("angry", lastOnly, 1, 2), true)
+    assert.equal(L.joltOnStep("angry", lastOnly, 2, 2), false)
+  })
+
+  test("sameArt tells a real change of art from a fresh copy", () => {
+    const raw = { palette: { k: "#000000", o: "#ffffff" }, phases: { angry: { frames: [["ko"], ["ok"]], loopFrom: 1 } } }
+    const a = L.normalizeTheme(raw)
+    assert.equal(L.sameArt(a, L.normalizeTheme(JSON.parse(JSON.stringify(raw)))), true)
+    assert.equal(L.sameArt(a, L.normalizeTheme({ ...raw, palette: { k: "#000000", o: "#eeeeee" } })), false)
+    assert.equal(L.sameArt(a, L.normalizeTheme({ ...raw, phases: { angry: { frames: [["ko"], ["kk"]], loopFrom: 1 } } })), false)
+    assert.equal(L.sameArt(a, L.normalizeTheme({ ...raw, phases: { angry: { frames: [["ko"], ["ok"]] } } })), false)
+    assert.equal(L.sameArt(null, a), false)
+    assert.equal(L.sameArt(a, { ...a, caption: "x" }), true)                              // captions and colors are not art
+  })
+
+  test("the sprite is centred on the text band, never above the column", () => {
+    assert.equal(L.spriteTop(40, 240, 100, 0), 90)
+    assert.equal(L.spriteTop(40, 241, 100, 0), 91)                                          // whole pixels
+    assert.equal(L.spriteTop(40, 140, 200, 0), 0)                                           // taller: clamped to the column
+    assert.equal(L.spriteTop(40, 140, 200, 10), 10)
   })
 })
 
@@ -242,11 +323,12 @@ describe("shipped themes", () => {
     for (const p of ["relaxed", "tense", "angry"]) assert.equal(t.phases[p].caption, "")
   })
 
-  for (const name of ["marine", "shiba", "boss"]) {
+  // the marine is redrawn at 40x40; shiba and boss stay 16x16 until their own redraws
+  for (const [name, size] of [["marine", 40], ["shiba", 16], ["boss", 16]]) {
     test(name + ": three distinct expressions, captions, growing animation", () => {
       const t = L.normalizeTheme(load(name + ".json"))
-      assert.equal(t.cols, 16)
-      assert.equal(t.rows, 16)
+      assert.equal(t.cols, size)
+      assert.equal(t.rows, size)
       const ph = t.phases
       assert.equal(ph.relaxed.frames.length, 1)                                             // relaxed stands still
       assert.ok(ph.tense.frames.length >= 2 && ph.angry.frames.length >= 2)
@@ -256,12 +338,22 @@ describe("shipped themes", () => {
       assert.equal(new Set([first("relaxed"), first("tense"), first("angry")]).size, 3)
       for (const p of ["relaxed", "tense", "angry"]) {
         assert.ok(ph[p].caption.length > 0, p + " caption")
-        assert.equal(new Set(ph[p].frames.map((f) => f.join("\n"))).size, ph[p].frames.length, p + " frames repeat")
+        // a frame may repeat to hold a picture longer, but an animated phase shows at least two
+        if (p !== "relaxed") assert.ok(new Set(ph[p].frames.map((f) => f.join("\n"))).size >= 2, p + " never changes")
       }
       assert.equal(ph.progress, undefined)
       assert.equal(t.progress, false)
     })
   }
+
+  test("marine: tense and angry play an intro once, then loop; the jolt waits for the loop", () => {
+    const ph = L.normalizeTheme(load("marine.json")).phases
+    assert.ok(ph.tense.loopFrom > 0 && ph.tense.loopFrom < ph.tense.frames.length)
+    assert.ok(ph.angry.loopFrom > 0 && ph.angry.loopFrom < ph.angry.frames.length)
+    assert.equal(ph.angry.shake, true)
+    assert.equal(L.joltOnEnter("angry", ph.angry), false)
+    assert.equal(L.joltOnStep("angry", ph.angry, ph.angry.loopFrom - 1, ph.angry.loopFrom), true)
+  })
 
   test("no third-party names in theme files", () => {
     for (const f of files) assert.doesNotMatch(f + readFileSync(new URL(f, themesDir), "utf8"), /doom|id software/i, f)

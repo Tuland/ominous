@@ -32,9 +32,10 @@ its default theme and `omarchy-shell ominous status` reports the error in `theme
 | `palette` | Sprite only. One character per color; characters not listed are transparent. |
 | `phases.<relaxed\|tense\|angry>.color` | Signal color of the countdown, the selected button and the bar. Unset: accent, a blend of accent and urgent, urgent. |
 | `phases.*.caption` | One line of plain text under the countdown (80 characters at most). |
-| `phases.*.frames` | Sprite frames: lists of equal-length text rows, each cell one palette character. At most 32x32, and every frame of every phase has the same size. |
+| `phases.*.frames` | Sprite frames: lists of equal-length text rows, each cell one palette character. At most 40x40 and 64 frames per phase, and every frame of every phase has the same size. A phase with no frames (or `[]`) shows no sprite. |
 | `phases.*.frameMs` | Time per frame, 80–5000 ms (default 500). |
-| `phases.angry.shake` | `true` shakes the sprite once when the meeting starts. |
+| `phases.*.loopFrom` | The first looped frame: the frames before it play once as an intro, then the frames from it to the last repeat. A whole number below the frame count; anything else means 0 (every frame loops). The intro plays again when the card opens, the phase changes or the mode switches, not when the meeting's details change on an open card. |
+| `phases.angry.shake` | `true` shakes the sprite once when the meeting starts; with a `loopFrom` in angry, once when its loop starts instead. |
 
 Colors are palette roles (`accent`, `urgent`, `foreground`, `muted`, `background`,
 `transparent`), which follow the current Omarchy theme, or hex (`#rgb`, `#rrggbb`, `#rrggbbaa`).
@@ -42,8 +43,9 @@ A sprite that is malformed is ignored; the colors and captions of the theme stil
 
 ## Tips
 
-- 16x16 cells read well; the card draws each cell as a whole-pixel square, so the art stays
-  crisp at any scale.
+- The card draws each cell as a whole-pixel square, 5 screen pixels at the default scale (7
+  before sprites grew to 40x40), so the art stays crisp at any scale: a 16x16 sprite is 80 pixels
+  wide, a 40x40 one 200.
 - Use roles for outlines and accents, so the character fits light and dark Omarchy themes alike.
 - Keep relaxed to one still frame and let the animation grow toward angry, as the shipped themes
   do.
