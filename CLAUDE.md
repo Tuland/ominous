@@ -26,9 +26,9 @@ never edit it): entry QML files at the top, one pure logic file, reusable pieces
   for the service.
 - `themes/` — the shipped themes. `marine`, `shiba` and `boss` are drawn by
   `tools/draw-themes.py`: change the art there and rerun it, never the JSON by hand
-  (`tests/run.sh` fails if they differ). `marine` comes from text grids in `tools/art/marine/`,
-  exported from drafts and read by the script; `shiba` and `boss` are still coordinates in it
-  until they are redrawn the same way.
+  (`tests/run.sh` fails if they differ). `marine` and `shiba` come from text grids in
+  `tools/art/<theme>/`, exported from drafts and read by the script; `boss` is still coordinates
+  in it until it is redrawn the same way.
 - `drafts/` and `.claude/skills/codixel/` — ignored by git: art drafts, and the pixel-art skill
   that `mise run setup` (`tools/setup-dev.sh`) fetches at a pinned commit. Never shipped.
 - `tests/` — `*.test.mjs` unit tests by concern sharing `helpers.mjs`, plus `live.sh` and

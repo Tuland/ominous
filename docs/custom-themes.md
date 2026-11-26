@@ -39,7 +39,8 @@ its default theme and `omarchy-shell ominous status` reports the error in `theme
 
 Colors are palette roles (`accent`, `urgent`, `foreground`, `muted`, `background`,
 `transparent`), which follow the current Omarchy theme, or hex (`#rgb`, `#rrggbb`, `#rrggbbaa`).
-A sprite that is malformed is ignored; the colors and captions of the theme still apply.
+A sprite cell in a hex color with alpha is drawn over the card, which shows through it: `#00000080`
+darkens the card behind by half. A sprite that is malformed is ignored; the colors and captions of the theme still apply.
 
 ## Tips
 

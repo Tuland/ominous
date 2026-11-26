@@ -11,8 +11,8 @@ writes `themes/<name>.json`. A user's own theme is a JSON file in
 `~/.config/omarchy/ominous/themes/` (format: `docs/custom-themes.md`). Never edit a shipped
 theme's JSON by hand: `tests/run.sh` fails when it differs from the script.
 
-`marine` is 40x40 and drawn from text grids in `tools/art/marine/`, the first character
-redrawn. `shiba` and `boss` are still 16x16 and drawn as coordinates in `tools/draw-themes.py`
+`marine` and `shiba` are 40x40 and drawn from text grids in `tools/art/<theme>/`, redrawn in
+that order. `boss` is still 16x16 and drawn as coordinates in `tools/draw-themes.py`
 (`tests/themes.test.mjs` checks the sizes). Each is being redrawn, one change at a time, from
 reference images through drafts into text grids (see "Redrawing a character"). Until a
 character is redrawn, small fixes to it stay in the coordinate code.
@@ -63,16 +63,64 @@ ships it). Where codixel and this skill disagree, this skill wins:
   realistic shading of its reference (a cartoon pass was rejected); that does not decide the
   others.
 - **Animation grows with urgency:** relaxed is one still frame; tense has a few slow frames
-  (`frameMs` ~900: eyes dart, a sweat drop slides); angry has fast frames (`frameMs` 120-250)
+  (`frameMs` ~900: eyes dart, a sweat drop slides, one held close-up when the phase begins);
+  angry has fast frames (`frameMs` 120-250)
   and `"shake": true`. `loopFrom` makes the frames before it an intro that plays once, then the
   rest loops (the marine ignites, then burns); in angry with `shake`, the jolt lands at the loop
   start instead of the phase start.
 - **Captions:** one ironic line per phase, 80 characters at most, in the character's voice.
 - **Colors:** use roles where the color should follow the Omarchy theme: `urgent` for anger
-  marks and glowing eyes, `accent` for a sweat drop or a tie, `muted` for steam. Use hex for skin,
-  fur, hair and fire. A near-black hex outline (`#1b1511`) reads on light and dark themes alike.
+  marks, `accent` for a tie, `muted` for steam. Use hex for skin, fur, hair, fire and the sweat
+  drop (its fixed light blues, see the standards; the legacy boss keeps `accent` until its redraw). A near-black hex outline (`#1b1511`) reads on light and dark themes alike.
   Phase colors: relaxed `accent`, tense left unset (the card blends accent into urgent), angry
   `urgent`.
+
+## Standards for every character
+
+Approved by the user after the marine and the shiba (`drafts/shiba/history/HISTORY.md`, section
+5). Everything else those two share is a precedent: reuse it when it fits, revise it when it does
+not, without touching the characters already done.
+
+- `ref.source`: references the user generated in one Gemini chat, one prompt per image, flat
+  frontal light, a flat blue background keyed out.
+- `grid`: 40x40 cells, 5 px each on the card.
+- `detail.thin`: straps, whiskers, collars and other one-cell lines are removed from the
+  reference or drawn in code; pixelated, they glitch.
+- `fx.code`: effects (fire, storm, mist, lightning, sparks) are built in code, never pixelated
+  from a picture.
+- `tense.sweat`: the tension badge is the sweat drop, the same shape on every character: fixed
+  light blues `#8ec6e8` (body), `#c4e6f6` (light), `#eef9ff` (highlight), with `#5b9bd0` for the
+  shade cells; drawn by hand, never downsampled; on the face, on the temple above the eye line;
+  about 1/8 of the face's width; one top-left highlight, a one-cell tip that is never the
+  lightest, the mass low; it slides one row in the loop.
+- `tense.closeup`: tense's intro holds one close-up on the face between bust frames (bust, held
+  close-up, bust), then the bust loops (`loopFrom` after the close-up), the gaze matching across
+  each cut.
+- `angry.shake`: angry has `"shake": true`; with an intro the jolt lands on the hand-over to the
+  loop.
+- `safety.flash`: at most 2 flashes in any second, counted by the test in
+  `tests/themes.test.mjs` on a light and a dark card.
+- `safety.contrast`: every phase reads on a light and on a dark card; check both
+  (`tests/theme-check.sh`).
+- `art.grids`: frames reach the repository only as text grids from a draft exporter (below).
+- `work.sheets`: one change per sheet, beside the accepted version, numbered in order.
+
+## Character sheet
+
+Every character is described by the same keys, so the next one is compared field by field:
+`tools/art/<theme>/character.json`, one per playful character, read in a minute. The keys, their
+types and the labels each may take live one level up, in `tools/art/characters.schema.json`. A
+new character that needs a new label adds it to the schema first; `tests/themes.test.mjs` fails
+on a key or label the schema does not know, and checks the timings, palette size, roles and
+flash count against the theme file. Phases are `relaxed`, `tense`, `angry`; a phase with an
+intro has the parts `intro` and `loop`. The values are precedents, except the keys the schema
+marks `"standard": true` (the rest of the standards, such as `grid` or `safety.flash`, are rules
+above, not sheet keys). `version` and `status` say how far to trust a sheet: below 1.0.0 the
+character is `legacy` (drawn before the standards; its values describe it, they are no model, and
+it waits for a redraw); 1.0.0 is the first redraw that meets the standards, a minor version a
+change to an approved look, a major one a new redraw. `codixel` maps each part (pixelation,
+palette, sweat drop, gaze, close-up, aura, eyes, particles, strikes, light) to the codixel tools
+that built it, or `none`: before a new part, look at which skill section the others needed.
 
 ## Pixel pitfalls already met
 
@@ -111,13 +159,17 @@ ships it). Where codixel and this skill disagree, this skill wins:
    - frames in order, each a block of rows, one palette letter per cell, every row the same
      length; blocks separated by exactly one empty line; no other lines, comments or trailing
      spaces;
-   - pixel to letter: alpha 0 is `.`; alpha 255 must match exactly the RGB of one letter; any
-     other alpha or an unknown RGB fails the export, naming the pixel. Every letter has a
-     distinct RGB. A role letter (`accent`, `urgent`, ...) uses a fixed stand-in RGB chosen in
+   - pixel to letter: alpha 0 is `.`; any other alpha must match exactly the RGBA of one
+     letter, written `#rrggbb` at alpha 255 and `#rrggbbaa` otherwise (drawn over the card: the
+     shiba's mist); an unknown RGBA fails the export, naming the pixel. Every letter has a
+     distinct RGBA. Letters are printable ASCII other than `.`, `"` and `\` (about 90); past that,
+     only single BMP letters that are neither combining nor whitespace. A role letter (`accent`, `urgent`, ...) uses a fixed stand-in RGB chosen in
      the draft, not the live theme color.
 
-   `tools/draw-themes.py` reads the grids (`read_grids`, which stops on a grid that breaks the
-   contract, naming the file and line) and keeps owning the palette, captions, `frameMs`,
+   The exporter enforces the pixel-to-letter rules (RGBA, distinct letters, the letter budget).
+   `tools/draw-themes.py` reads the grids (`read_grids`, which stops on a grid that is not UTF-8,
+   has a row of the wrong length, a stray blank line, trailing spaces or a letter missing from
+   the palette, naming the file and line; it does not check the palette's colors) and keeps owning the palette, captions, `frameMs`,
    `loopFrom`, `shake` and the JSON.
 4. Then the checks in "Workflow" below, from step 2.
 

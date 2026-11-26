@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Draws the playful themes' pixel art and writes themes/marine.json, shiba.json and boss.json.
 
-The marine comes from text grids in tools/art/marine/ (read by read_grids, exported from approved
-drafts); shiba and boss are still code, so each expression is built from the same face and
-changes stay small. Edit a grid or a function below, then run
+The marine and the shiba come from text grids in tools/art/<theme>/ (read by read_grids,
+exported from approved drafts); the boss is still code, so each expression is built from the
+same face and changes stay small. Edit a grid or a function below, then run
 
     tools/draw-themes.py            write the three theme files
     tools/draw-themes.py --show     write them and print every frame as text, to review
@@ -22,7 +22,7 @@ Grid = list[list[str]]  # N rows of N palette characters
 Frame = list[str]  # the grid as text rows, as a theme file stores it
 Theme = dict[str, Any]  # a theme file's JSON object
 
-N = 16  # shiba and boss, still drawn as coordinates
+N = 16  # the boss, still drawn as coordinates
 THEMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "themes")
 ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 PHASES = ("relaxed", "tense", "angry")
@@ -72,16 +72,18 @@ def rows(g: Grid) -> Frame:
 # drafts; this script owns its palette, captions and timing. The grid letters below are the
 # exporter's: tones of the bust and the close-up (dark to light), the four fire tones (deep red,
 # orange, yellow, pale yellow core) and the sweat drop.
+# skin and brown tones (hue 45 or below, lightness 0.12 or above, saturation below 0.45) at
+# saturation x1.3, sheet 013 of drafts/shiba (shiba-storm)
 MARINE_PALETTE: dict[str, str] = {
         ".": "transparent",
-        "a": "#080605", "b": "#090706", "c": "#1c1411", "d": "#1b1511", "e": "#1f1714", "f": "#2f1f1a",
-        "g": "#392923", "h": "#3c2d27", "i": "#4b3a31", "j": "#8e1f12", "k": "#4b3b33", "l": "#4b4d2f",
-        "m": "#59483d", "n": "#5d463e", "o": "#6a4d43", "p": "#6b5249", "q": "#60574e", "r": "#5c5f39",
-        "s": "#78594d", "t": "#66693f", "u": "#7c5d53", "v": "#696c42", "w": "#72635a", "x": "#906659",
-        "y": "#7c6e69", "z": "#757848", "A": "#db4f16", "B": "#91685b", "C": "#81736e", "D": "#7b7e4e",
-        "E": "#9f766a", "F": "#868954", "G": "#a37768", "H": "#8e817c", "I": "#90945b", "J": "#af8274",
-        "K": "#979a5f", "L": "#b6897a", "M": "#9c9897", "N": "#9ea268", "O": "#a2a56d", "P": "#c19486",
-        "Q": "#b4a69c", "R": "#f59e22", "S": "#afb281", "T": "#d2a79c", "U": "#8ec6e8", "V": "#d7b7ab",
+        "a": "#080605", "b": "#090706", "c": "#1c1411", "d": "#1b1511", "e": "#1f1714", "f": "#321d17",
+        "g": "#3c2820", "h": "#3f2c24", "i": "#4f392d", "j": "#8e1f12", "k": "#4f3a2f", "l": "#4b4d2f",
+        "m": "#5d4739", "n": "#624439", "o": "#704a3d", "p": "#705044", "q": "#63574b", "r": "#5c5f39",
+        "s": "#7e5647", "t": "#66693f", "u": "#825a4d", "v": "#696c42", "w": "#766256", "x": "#986251",
+        "y": "#7f6d66", "z": "#757848", "A": "#db4f16", "B": "#996453", "C": "#84726b", "D": "#7b7e4e",
+        "E": "#a77262", "F": "#868954", "G": "#ac735f", "H": "#918079", "I": "#90945b", "J": "#b87d6b",
+        "K": "#979a5f", "L": "#bf8471", "M": "#9d9896", "N": "#9ea268", "O": "#a2a56d", "P": "#ca8f7d",
+        "Q": "#b8a598", "R": "#f59e22", "S": "#afb281", "T": "#daa294", "U": "#8ec6e8", "V": "#deb4a4",
         "W": "#c4e6f6", "X": "#fde084", "Y": "#eef9ff",
 }
 
@@ -177,83 +179,42 @@ MARINE: Theme = {
 
 
 # ---------------------------------------------------------------- shiba
-def shiba(mood: str, variant: int = 0) -> Frame:
-    """Draws the shiba, the dog of the doge meme style.
+# From drafts/shiba/work/export.js (sheet 056): 90 colors, one ASCII letter each; the mist's
+# steps carry alpha (#rrggbbaa), drawn over the card.
+SHIBA_PALETTE: dict[str, str] = {
+        ".": "transparent", "!": "#1b1511", "#": "#5e4538", "$": "#1c1c3180", "%": "#3f3535", "&": "#cd7c35",
+        "'": "#1c1c3138", "(": "#1c1c31cc", ")": "#1c1c31", "*": "#ae6d36", "+": "#504544", ",": "#a28063",
+        "-": "#453d3e", "/": "#372c2d", "0": "#503c34", "1": "#907154", "2": "#5c504d", "3": "#71513b",
+        "4": "#d08a4d", "5": "#8e5e38", "6": "#af977e", "7": "#6c5b53", "8": "#7c6658", "9": "#cbaf93",
+        ":": "#755f4e", ";": "#775133", "<": "#d39b66", "=": "#0f0e15", ">": "#2a2a5180", "?": "#2a2a5138",
+        "@": "#261f25", "A": "#8e5e39", "B": "#2a2a51cc", "C": "#d9c2ac", "D": "#573924", "E": "#957862",
+        "F": "#58443d", "G": "#a58b7a", "H": "#0c0c1338", "I": "#0c0c1380", "J": "#d8a582", "K": "#090606",
+        "L": "#1b1515", "M": "#2a2a51", "N": "#b09b8e", "O": "#0c0c13cc", "P": "#392d2c", "Q": "#7f4a23",
+        "R": "#a96b38", "S": "#bea599", "T": "#a08e8e", "U": "#c3b2ac", "V": "#33221c", "W": "#806668",
+        "X": "#897678", "Y": "#dab69d", "Z": "#c27a3c", "[": "#c88d5a", "]": "#d6c1b9", "^": "#c4987c",
+        "_": "#8ec6e8", "`": "#6c67a6", "a": "#7d76b8", "b": "#3d456b80", "c": "#decdc9", "d": "#3d456b",
+        "e": "#f6f3ff", "f": "#cfc8ff", "g": "#5b9bd0", "h": "#3d456bcc", "i": "#53638380", "j": "#793a43",
+        "k": "#7b6258", "l": "#d4ec72", "m": "#977d69", "n": "#3d456b38", "o": "#9c8587", "p": "#594947",
+        "q": "#4a4778", "r": "#c0af9e", "s": "#ad5f74", "t": "#eef9ff", "u": "#8c4d61", "v": "#c4e6f6",
+        "w": "#536383cc", "x": "#b49c88", "y": "#536383", "z": "#553b31", "{": "#e1d2c3", "|": "#9f6f4a",
+        "}": "#d6c3b0",
+}
 
-    Args:
-        mood: "relaxed", "tense" or "angry".
-        variant: The animation frame of that mood.
-
-    Returns:
-        The frame as text rows.
-    """
-    g = blank()
-    angry = mood == "angry"
-    fur = "q" if angry else "o"
-    spans = {4: (3, 12), 5: (2, 13), 6: (1, 14), 7: (1, 14), 8: (1, 14), 9: (1, 14),
-             10: (1, 14), 11: (1, 14), 12: (2, 13), 13: (3, 12), 14: (5, 10)}
-    shape = set()
-    for y, (a, b) in spans.items():
-        for x in range(a, b + 1):
-            shape.add((x, y))
-    # ears: upright, or flattened sideways when angry
-    ear = ([(1, 2), (1, 3), (2, 3), (3, 3), (2, 4), (3, 4), (4, 4)] if angry
-           else [(2, 1), (2, 2), (3, 2), (2, 3), (3, 3), (4, 3), (3, 4), (4, 4), (5, 4)])
-    for x, y in ear:
-        shape.add((x, y)); shape.add((15 - x, y))
-    inner = [(2, 3)] if angry else [(3, 3)]
-    for (x, y) in shape:
-        g[y][x] = fur
-    # outline: any shape pixel touching empty space
-    for (x, y) in list(shape):
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            if (x + dx, y + dy) not in shape:
-                g[y][x] = "k"
-    for (x, y) in inner:
-        put(g, [(x, y), (15 - x, y)], "i")
-    # cream muzzle and cheeks
-    for y, (a, b) in {9: (5, 10), 10: (4, 11), 11: (4, 11), 12: (4, 11), 13: (5, 10)}.items():
-        for x in range(a, b + 1):
-            if g[y][x] != "k":
-                g[y][x] = "c"
-    put(g, [(4, 5), (11, 5)], "c")  # the pale dots above a shiba's eyes
-    put(g, [(7, 9), (8, 9)], "k")  # nose
-
-    if mood == "relaxed":
-        put(g, [(4, 8), (5, 7), (6, 8), (9, 8), (10, 7), (11, 8)], "k")  # happy closed eyes
-        put(g, [(6, 10), (9, 10), (7, 11), (8, 11)], "k")  # smile
-    elif mood == "tense":
-        rect(g, 4, 6, 6, 8, "w"); rect(g, 9, 6, 11, 8, "w")
-        px = 4 if variant == 0 else 6
-        put(g, [(px, 7), (px + 5, 7)], "k")
-        put(g, [(6, 11), (9, 11), (7, 12), (8, 12)], "k")  # worried mouth
-        dy = 0 if variant == 0 else 1
-        put(g, [(8, 4 + dy), (8, 5 + dy)], "b")  # sweat
-    else:
-        put(g, [(3, 6), (4, 6), (5, 7), (6, 7), (12, 6), (11, 6), (10, 7), (9, 7)], "k")  # furrowed brows
-        put(g, [(4, 8), (6, 8), (9, 8), (11, 8)], "k"); put(g, [(5, 8), (10, 8)], "r")
-        if variant == 1:  # barking
-            rect(g, 5, 10, 10, 13, "k"); rect(g, 6, 11, 9, 12, "m"); put(g, [(6, 10), (9, 10)], "w")
-            put(g, [(7, 12), (8, 12)], "r")
-        else:  # snarl
-            rect(g, 5, 10, 10, 10, "k"); put(g, [(5, 11), (10, 11)], "k")
-            put(g, [(6, 11), (9, 11), (6, 12), (9, 12)], "w"); put(g, [(7, 11), (8, 11)], "m")
-        if variant == 2:  # fur standing up
-            put(g, [(0, 7), (0, 9), (15, 7), (15, 9)], "k")
-    return rows(g)
-
+try:
+    SHIBA_FRAMES = read_grids("shiba", SHIBA_PALETTE)
+except GridError as e:
+    sys.exit(f"draw-themes: {e}")
 
 SHIBA: Theme = {
     "progress": False,
-    "palette": {
-        ".": "transparent", "k": "#241713", "o": "#e08a3c", "q": "#e2552f", "c": "#f6e7c8",
-        "i": "#e9959a", "w": "#ffffff", "m": "#6e2a2a", "r": "urgent", "b": "accent",
-    },
+    "palette": SHIBA_PALETTE,
     "phases": {
-        "relaxed": {"color": "accent", "caption": "such calm. very agenda.", "frames": [shiba("relaxed")]},
-        "tense": {"caption": "much soon. wow.", "frameMs": 900, "frames": [shiba("tense", 0), shiba("tense", 1)]},
-        "angry": {"color": "urgent", "caption": "very late. so meeting.", "frameMs": 250, "shake": True,
-                  "frames": [shiba("angry", 0), shiba("angry", 1), shiba("angry", 2)]},
+        "relaxed": {"color": "accent", "caption": "such calm. very agenda.", "frames": SHIBA_FRAMES["relaxed"]},
+        # eyes darting and a sweat drop: the bust, one held close-up on entering the phase, then the bust in a loop
+        "tense": {"caption": "much soon. wow.", "frameMs": 900, "loopFrom": 8, "frames": SHIBA_FRAMES["tense"]},
+        # night falls and the eyes light up, then a storm loop: barks, then a snarl (the jolt lands on the first strike)
+        "angry": {"color": "urgent", "caption": "very late. so meeting.", "frameMs": 120, "shake": True, "loopFrom": 10,
+                  "frames": SHIBA_FRAMES["angry"]},
     },
 }
 

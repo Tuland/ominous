@@ -9,14 +9,14 @@ with `M` or the switch on the card; choose each mode's theme from a terminal.
 |---|---|---|
 | `classic` | professional | No art. The phase color on the countdown and a thin progress bar along the bottom edge. |
 | `marine` | playful | A helmeted soldier in olive gear, drawn as a 40x40 bust: calm → a standoff, eyes darting, a sweat drop and one close-up on his stare → his eyes catch fire, flames and sparks rise around him, and he alternates a short burst of laughter with a longer furious burn. "All clear." / "Incoming." / "YOU ARE LATE." |
-| `shiba` | | A shiba, content → worried → snarling, with doge-style captions. |
+| `shiba` | | A red shiba, drawn as a 40x40 bust: content → worried, eyes darting, a sweat drop and one close-up → night falls, its eyes light up, and it barks and snarls in a lightning storm, each strike lighting it. Doge-style captions. |
 | `boss` | | An executive in a suit, smug → sweating → red-faced with steam from the ears. "Let's circle back." / "Can you see my screen?" / "Per my last email." The tie takes the theme's accent color. |
 
 In the playful themes the character stands still while relaxed, fidgets when tense and animates
 faster once angry, with a jolt when it gets angry (or, for a character with an angry intro, when
 the intro gives way to its loop). The phase color of the countdown follows the Omarchy theme,
-and so do the cells `shiba` and `boss` draw in a role color, such as the boss's tie; skin,
-fur and gear keep fixed colors, and the `marine` uses only fixed colors, fire included.
+and so do the cells `boss` draws in a role color, such as its tie; skin and gear keep fixed
+colors, and the `marine` and the `shiba` use only fixed colors, fire and storm included.
 
 The characters are original pixel art drawn for this plugin, a nod to 90s FPS status-bar faces
 and to the doge meme; they use no third-party artwork.
@@ -35,6 +35,9 @@ The source of every reference image behind shipped art.
 - `marine`: two images the author generated for this plugin, not published: a sheet of one
   soldier in four moods (the bust, the calm, tense, furious and laughing faces) and the same
   sheet with the eyes turned (the darting eyes of the standoff). The fire is drawn in code.
+- `shiba`: two images the author generated for this plugin, not published: a sheet of one dog
+  in four moods (content, worried, snarling, barking) and the same sheet with the eyes turned
+  (the darting eyes). The storm, its mist and the lightning are drawn in code.
 
 ## Choosing a theme
 

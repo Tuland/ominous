@@ -1,0 +1,72 @@
+{
+  "version": "0.1.0",
+  "status": "legacy",
+  "cue": "suit",
+  "style.shading": "flat",
+  "ref.source": "none",
+  "palette.size": 17,
+  "relaxed.face": "smug",
+  "tense.face": "sweating",
+  "tense.gaze": "dart",
+  "tense.sweat": "drop",
+  "tense.closeup": "none",
+  "tense.timing": {
+    "frames": 2,
+    "ms": 900,
+    "loopFrom": 0
+  },
+  "angry.intro": "none",
+  "angry.faces": [
+    "red-face"
+  ],
+  "angry.aura": "none",
+  "angry.eyes": "plain",
+  "angry.particles": "steam",
+  "angry.strikes": "none",
+  "angry.light": [],
+  "angry.shake": "on-enter",
+  "angry.timing": {
+    "frames": 3,
+    "ms": 250,
+    "loopFrom": 0
+  },
+  "angry.flashes": 0,
+  "colors.roles": [
+    "accent",
+    "muted",
+    "urgent"
+  ],
+  "caption.voice": "jargon",
+  "codixel": {
+    "pixelation": [
+      "none"
+    ],
+    "palette": [
+      "none"
+    ],
+    "tense.sweat": [
+      "none"
+    ],
+    "tense.gaze": [
+      "none"
+    ],
+    "tense.closeup": [
+      "none"
+    ],
+    "angry.aura": [
+      "none"
+    ],
+    "angry.eyes": [
+      "none"
+    ],
+    "angry.particles": [
+      "none"
+    ],
+    "angry.strikes": [
+      "none"
+    ],
+    "angry.light": [
+      "none"
+    ]
+  }
+}

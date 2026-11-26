@@ -1,0 +1,80 @@
+{
+  "version": "1.0.0",
+  "status": "redrawn",
+  "cue": "breed",
+  "style.shading": "realistic",
+  "ref.source": "ai-sheet-03, ai-sheet-04",
+  "palette.size": 90,
+  "relaxed.face": "happy-squint",
+  "tense.face": "worried",
+  "tense.gaze": "dart",
+  "tense.sweat": "drop",
+  "tense.closeup": "held",
+  "tense.timing": {
+    "frames": 12,
+    "ms": 900,
+    "loopFrom": 8
+  },
+  "angry.intro": "nightfall",
+  "angry.faces": [
+    "bark",
+    "snarl"
+  ],
+  "angry.aura": "mist",
+  "angry.eyes": "glow",
+  "angry.particles": "none",
+  "angry.strikes": "bolts",
+  "angry.light": [
+    "night",
+    "flash",
+    "backlight",
+    "sidelight"
+  ],
+  "angry.shake": "on-loop",
+  "angry.timing": {
+    "frames": 34,
+    "ms": 120,
+    "loopFrom": 10
+  },
+  "angry.flashes": 2,
+  "colors.roles": [],
+  "caption.voice": "doge-speak",
+  "codixel": {
+    "pixelation": [
+      "removeBg",
+      "resize",
+      "quantize"
+    ],
+    "palette": [
+      "quantize"
+    ],
+    "tense.sweat": [
+      "hand-drawn"
+    ],
+    "tense.gaze": [
+      "none"
+    ],
+    "tense.closeup": [
+      "removeBg",
+      "resize"
+    ],
+    "angry.aura": [
+      "loopNoise",
+      "hueRamp",
+      "soft-edges"
+    ],
+    "angry.eyes": [
+      "none"
+    ],
+    "angry.particles": [
+      "none"
+    ],
+    "angry.strikes": [
+      "layers",
+      "rng"
+    ],
+    "angry.light": [
+      "none"
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "version": "1.1.0",
+  "status": "redrawn",
+  "cue": "helmet",
+  "style.shading": "realistic",
+  "ref.source": "ai-sheet-04, ai-sheet-05",
+  "palette.size": 51,
+  "relaxed.face": "half-smile",
+  "tense.face": "worried",
+  "tense.gaze": "dart",
+  "tense.sweat": "drop",
+  "tense.closeup": "held",
+  "tense.timing": {
+    "frames": 12,
+    "ms": 900,
+    "loopFrom": 8
+  },
+  "angry.intro": "ignition",
+  "angry.faces": [
+    "laugh",
+    "burn"
+  ],
+  "angry.aura": "fire",
+  "angry.eyes": "ember",
+  "angry.particles": "sparks",
+  "angry.strikes": "none",
+  "angry.light": [],
+  "angry.shake": "on-loop",
+  "angry.timing": {
+    "frames": 34,
+    "ms": 120,
+    "loopFrom": 10
+  },
+  "angry.flashes": 0,
+  "colors.roles": [],
+  "caption.voice": "terse",
+  "codixel": {
+    "pixelation": [
+      "removeBg",
+      "resize",
+      "quantize"
+    ],
+    "palette": [
+      "quantize"
+    ],
+    "tense.sweat": [
+      "none"
+    ],
+    "tense.gaze": [
+      "none"
+    ],
+    "tense.closeup": [
+      "removeBg",
+      "resize",
+      "quantize"
+    ],
+    "angry.aura": [
+      "loopNoise",
+      "fbm"
+    ],
+    "angry.eyes": [
+      "loopNoise"
+    ],
+    "angry.particles": [
+      "rng"
+    ],
+    "angry.strikes": [
+      "none"
+    ],
+    "angry.light": [
+      "none"
+    ]
+  }
+}

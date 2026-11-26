@@ -1,0 +1,219 @@
+{
+  "_about": "The character sheet: the keys every playful character is described by, and the labels each key may take. A character file (tools/art/<theme>/character.json) uses only these keys and labels; a new label goes here first. Types: label = one of values; labels = a list of values; number; text; timing = {frames, ms, loopFrom}, checked against the theme file; version = semver; map = an object whose keys and list values are both labels of the schema entry. Standards (ominous-theme skill) are marked in the description. A key with \"standard\": true is a standard of the ominous-theme skill.",
+  "version": {
+    "type": "version",
+    "description": "The character's version (semver). Below 1.0.0: legacy art, drawn before the standards; its values describe what it is, not what it should be, and wait for a redraw. 1.0.0: the first redraw that meets the standards; minor: a change to an approved look (a palette tone); major: a redraw"
+  },
+  "status": {
+    "type": "label",
+    "description": "legacy: below 1.0.0, not a model for other characters; redrawn: meets the standards",
+    "values": [
+      "legacy",
+      "redrawn"
+    ]
+  },
+  "cue": {
+    "type": "label",
+    "description": "What tells who it is at 40 cells",
+    "values": [
+      "helmet",
+      "breed",
+      "suit"
+    ]
+  },
+  "style.shading": {
+    "type": "label",
+    "description": "How the faces are shaded",
+    "values": [
+      "realistic",
+      "cartoon",
+      "flat"
+    ]
+  },
+  "ref.source": {
+    "type": "text",
+    "description": "The reference sheets behind the frames (drafts/<theme>/refs/), or none"
+  },
+  "palette.size": {
+    "type": "number",
+    "description": "Colors in the palette, transparent not counted (checked against the theme file)"
+  },
+  "relaxed.face": {
+    "type": "label",
+    "description": "The calm face",
+    "values": [
+      "half-smile",
+      "happy-squint",
+      "smug"
+    ]
+  },
+  "tense.face": {
+    "type": "label",
+    "description": "The face when the meeting is close",
+    "values": [
+      "worried",
+      "sweating"
+    ]
+  },
+  "tense.gaze": {
+    "type": "label",
+    "description": "How the eyes move in tense",
+    "values": [
+      "dart",
+      "still"
+    ]
+  },
+  "tense.sweat": {
+    "type": "label",
+    "description": "The tension badge (standard: drop)",
+    "values": [
+      "drop",
+      "none"
+    ],
+    "standard": true
+  },
+  "tense.closeup": {
+    "type": "label",
+    "description": "The held close-up in tense's intro, between bust frames: bust, close-up, bust loop (standard: held)",
+    "values": [
+      "held",
+      "none"
+    ],
+    "standard": true
+  },
+  "tense.timing": {
+    "type": "timing",
+    "description": "Frames, interval and loop start of tense (checked against the theme file)"
+  },
+  "angry.intro": {
+    "type": "label",
+    "description": "The transformation before the angry loop",
+    "values": [
+      "ignition",
+      "nightfall",
+      "none"
+    ]
+  },
+  "angry.faces": {
+    "type": "labels",
+    "description": "The faces of the angry loop, in order: a short burst, then the long one",
+    "values": [
+      "laugh",
+      "burn",
+      "bark",
+      "snarl",
+      "red-face"
+    ]
+  },
+  "angry.aura": {
+    "type": "label",
+    "description": "What surrounds the silhouette",
+    "values": [
+      "fire",
+      "mist",
+      "none"
+    ]
+  },
+  "angry.eyes": {
+    "type": "label",
+    "description": "The eyes when angry",
+    "values": [
+      "ember",
+      "glow",
+      "plain"
+    ]
+  },
+  "angry.particles": {
+    "type": "label",
+    "description": "Small moving bits",
+    "values": [
+      "sparks",
+      "steam",
+      "none"
+    ]
+  },
+  "angry.strikes": {
+    "type": "label",
+    "description": "Events that hit the scene",
+    "values": [
+      "bolts",
+      "none"
+    ]
+  },
+  "angry.light": {
+    "type": "labels",
+    "description": "How the scene lights the character",
+    "values": [
+      "flash",
+      "night",
+      "backlight",
+      "sidelight"
+    ]
+  },
+  "angry.shake": {
+    "type": "label",
+    "description": "The jolt (standard): on the hand-over to the loop with an intro, else on entering",
+    "values": [
+      "on-loop",
+      "on-enter"
+    ],
+    "standard": true
+  },
+  "angry.timing": {
+    "type": "timing",
+    "description": "Frames, interval and loop start of angry (checked against the theme file)"
+  },
+  "angry.flashes": {
+    "type": "number",
+    "description": "Worst flashes in one second on a light or dark card, at most 2 (checked by the flash test)"
+  },
+  "colors.roles": {
+    "type": "labels",
+    "description": "Theme roles used in the sprite (none: an empty list)",
+    "values": [
+      "accent",
+      "urgent",
+      "muted",
+      "foreground",
+      "background"
+    ]
+  },
+  "caption.voice": {
+    "type": "label",
+    "description": "The voice of the captions",
+    "values": [
+      "terse",
+      "doge-speak",
+      "jargon"
+    ]
+  },
+  "codixel": {
+    "type": "map",
+    "description": "Where the codixel pixel-art skill did the work, part by part, and with what (rejected tries stay in drafts/<theme>/history/HISTORY.md). none: done by own code or by hand",
+    "keys": [
+      "pixelation",
+      "palette",
+      "tense.sweat",
+      "tense.gaze",
+      "tense.closeup",
+      "angry.aura",
+      "angry.eyes",
+      "angry.particles",
+      "angry.strikes",
+      "angry.light"
+    ],
+    "values": [
+      "removeBg",
+      "resize",
+      "quantize",
+      "hueRamp",
+      "loopNoise",
+      "fbm",
+      "rng",
+      "soft-edges",
+      "layers",
+      "hand-drawn",
+      "none"
+    ]
+  }
+}

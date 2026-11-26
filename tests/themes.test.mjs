@@ -297,6 +297,123 @@ describe("theme commands", () => {
   })
 })
 
+// The flash limit (spec "Shipped themes flash at most twice a second"): stand-in cards, with
+// stand-ins for the theme roles on each.
+const CARDS = {
+  light: { background: [0xee, 0xf0, 0xf6], foreground: [0x2a, 0x2b, 0x3a], accent: [0x3c, 0x6e, 0xdc], urgent: [0xd2, 0x32, 0x32], muted: [0x8c, 0x8c, 0x96] },
+  dark: { background: [0x0a, 0x0c, 0x22], foreground: [0xe6, 0xe4, 0xf4], accent: [0x78, 0xa0, 0xff], urgent: [0xf0, 0x50, 0x50], muted: [0x6e, 0x6e, 0x82] },
+}
+
+/** A palette token as [r, g, b, alpha 0..1] on a stand-in card; null for transparent or unknown. */
+function tokenRgba(token, card) {
+  const t = token.trim().toLowerCase()
+  if (t === "transparent") return null
+  if (card[t]) return [...card[t], 1]
+  let m = t.match(/^#([0-9a-f]{3})$/)
+  if (m) return [...m[1]].map((c) => parseInt(c + c, 16)).concat(1)
+  m = t.match(/^#([0-9a-f]{6})([0-9a-f]{2})?$/)
+  return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)).concat(m[2] ? parseInt(m[2], 16) / 255 : 1) : null
+}
+
+/** The color a cell shows on a card, [r, g, b]: its token blended over the card's background. */
+function cellRgb(token, card) {
+  const c = token === undefined ? null : tokenRgba(token, card), a = c ? c[3] : 0
+  return [0, 1, 2].map((i) => card.background[i] * (1 - a) + (c ? c[i] * a : 0))
+}
+
+/** WCAG relative luminance of an [r, g, b] color. */
+function luminance(rgb) {
+  const [r, g, b] = rgb.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** The mean luminance of the cells of a frame inside [x0, x1) x [y0, y1), drawn on a card. */
+function areaLuminance(frame, palette, card, [x0, y0, x1, y1]) {
+  let sum = 0, cells = 0
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) (sum += luminance(cellRgb(palette[frame[y][x]], card))), cells++
+  return sum / cells
+}
+
+/**
+ * Flashes in the worst window of `span` steps of a luminance sequence: a flash is a pair of
+ * opposing changes of at least 0.1, the darker side below 0.8; changes in the same direction
+ * merge into one (WCAG 2.3.1, general flash).
+ */
+function countFlashes(seq, span) {
+  let worst = 0
+  for (let a = 0; a + span < seq.length; a++) {
+    const dirs = []
+    let ref = seq[a]
+    for (let k = a + 1; k <= a + span; k++) {
+      const d = seq[k] - ref, s = Math.sign(d)
+      if (dirs.length && s === dirs[dirs.length - 1]) { ref = seq[k]; continue }
+      if (Math.abs(d) >= 0.1 && Math.min(seq[k], ref) < 0.8) { dirs.push(s); ref = seq[k] }
+    }
+    worst = Math.max(worst, Math.floor(dirs.length / 2))
+  }
+  return worst
+}
+
+/**
+ * The most flashes in any one-second window of a normalized phase played as on the card (the
+ * intro once, then the loop repeated until every window that starts in the intro or the first
+ * loop is whole; windows of floor(1000 / frameMs) steps), over the whole sprite and over each of
+ * its halves (top, bottom, left, right): a flash on half the 200-pixel sprite is about WCAG's
+ * smallest counted area, and a whole-sprite mean alone could dilute it.
+ */
+function worstFlashes(phase, palette, card) {
+  const w = phase.frames[0][0].length, h = phase.frames[0].length
+  const areas = [[0, 0, w, h], [0, 0, w, h >> 1], [0, h >> 1, w, h], [0, 0, w >> 1, h], [w >> 1, 0, w, h]]
+  const span = Math.floor(1000 / phase.frameMs)
+  return Math.max(...areas.map((area) => {
+    const lum = phase.frames.map((f) => areaLuminance(f, palette, card, area)), loop = lum.slice(phase.loopFrom || 0), seq = lum.slice()
+    while (seq.length <= lum.length + loop.length + span) seq.push(...loop)
+    return countFlashes(seq, span)
+  }))
+}
+
+/**
+ * Whether a theme file carries a third-party name: in its file name or captions only, never its
+ * frames, whose rows are runs of palette letters and can spell a word by chance.
+ */
+function namesThirdParty(file, raw) {
+  const captions = Object.values(raw.phases || {}).map((p) => (p && typeof p.caption === "string" ? p.caption : ""))
+  return /doom|id software|doge|dogecoin|kabosu/i.test([file, ...captions].join("\n"))
+}
+
+describe("flash counter and name guard", () => {
+  test("black and white frames alternating at 120 ms flash more than twice a second", () => {
+    const blink = { frames: [["k"], ["w"]], frameMs: 120, loopFrom: 0 }
+    for (const card of Object.values(CARDS)) assert.ok(worstFlashes(blink, { k: "#000000", w: "#ffffff" }, card) > 2)
+  })
+
+  test("the cutoffs: a change of 0.15 counts, 0.099 does not, nor one whose darker side is at 0.8", () => {
+    assert.equal(countFlashes([0.5, 0.65, 0.5, 0.65, 0.5], 4), 2)
+    assert.equal(countFlashes([0.5, 0.599, 0.5, 0.599, 0.5], 4), 0)
+    assert.equal(countFlashes([0.8, 0.95, 0.8, 0.95, 0.8], 4), 0)
+    assert.equal(countFlashes([0.79, 0.95, 0.79], 2), 1)
+  })
+
+  test("a flash on half the sprite counts even when the whole sprite's mean hides it", () => {
+    const top = "w".repeat(4), dark = "k".repeat(4), half = [top, top, dark, dark], none = [dark, dark, dark, dark]
+    const phase = { frames: [half, none], frameMs: 120, loopFrom: 0 }, pal = { k: "#000000", w: "#6a6a6a" }
+    assert.ok(countFlashes([0, 1, 0, 1, 0, 1, 0, 1, 0].map((k) => areaLuminance(phase.frames[k], pal, CARDS.dark, [0, 0, 4, 4])), 8) <= 2)
+    assert.ok(worstFlashes(phase, pal, CARDS.dark) > 2)
+  })
+
+  test("a half-transparent cell blends over the card, on a light and a dark card", () => {
+    for (const card of Object.values(CARDS)) {
+      const got = cellRgb("#00000080", card)
+      card.background.forEach((c, i) => assert.ok(Math.abs(got[i] - c * (1 - 128 / 255)) <= 1, `channel ${i} on ${c}`))
+    }
+  })
+
+  test("the guard reads names and captions, not frames", () => {
+    assert.equal(namesThirdParty("x.json", { phases: { relaxed: { caption: "Kabosu says hi" } } }), true)
+    assert.equal(namesThirdParty("x.json", { phases: { relaxed: { caption: "Fine.", frames: [["doge"]] } } }), false)
+  })
+})
+
 describe("shipped themes", () => {
   const themesDir = new URL("../themes/", import.meta.url)
   const files = readdirSync(themesDir).filter((f) => f.endsWith(".json"))
@@ -323,8 +440,8 @@ describe("shipped themes", () => {
     for (const p of ["relaxed", "tense", "angry"]) assert.equal(t.phases[p].caption, "")
   })
 
-  // the marine is redrawn at 40x40; shiba and boss stay 16x16 until their own redraws
-  for (const [name, size] of [["marine", 40], ["shiba", 16], ["boss", 16]]) {
+  // marine and shiba are redrawn at 40x40; the boss stays 16x16 until its own redraw
+  for (const [name, size] of [["marine", 40], ["shiba", 40], ["boss", 16]]) {
     test(name + ": three distinct expressions, captions, growing animation", () => {
       const t = L.normalizeTheme(load(name + ".json"))
       assert.equal(t.cols, size)
@@ -346,8 +463,9 @@ describe("shipped themes", () => {
     })
   }
 
-  test("marine: tense and angry play an intro once, then loop; the jolt waits for the loop", () => {
-    const ph = L.normalizeTheme(load("marine.json")).phases
+  for (const name of ["marine", "shiba"])
+  test(name + ": tense and angry play an intro once, then loop; the jolt waits for the loop", () => {
+    const ph = L.normalizeTheme(load(name + ".json")).phases
     assert.ok(ph.tense.loopFrom > 0 && ph.tense.loopFrom < ph.tense.frames.length)
     assert.ok(ph.angry.loopFrom > 0 && ph.angry.loopFrom < ph.angry.frames.length)
     assert.equal(ph.angry.shake, true)
@@ -356,6 +474,51 @@ describe("shipped themes", () => {
   })
 
   test("no third-party names in theme files", () => {
-    for (const f of files) assert.doesNotMatch(f + readFileSync(new URL(f, themesDir), "utf8"), /doom|id software/i, f)
+    for (const f of files) assert.equal(namesThirdParty(f, load(f)), false, f)
+  })
+
+  test("character sheets: tools/art/<theme>/character.json uses the schema's keys and labels, and matches its theme", () => {
+    const artDir = new URL("../tools/art/", import.meta.url)
+    const schema = JSON.parse(readFileSync(new URL("characters.schema.json", artDir), "utf8"))
+    const keys = Object.keys(schema).filter((k) => !k.startsWith("_"))
+    const names = readdirSync(artDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+    assert.deepEqual(names.sort(), ["boss", "marine", "shiba"])
+    for (const name of names) {
+      const c = JSON.parse(readFileSync(new URL(name + "/character.json", artDir), "utf8")), where = name + "/character.json"
+      assert.deepEqual(Object.keys(c).sort(), keys.slice().sort(), where + ": the schema's keys, no more, no fewer")
+      for (const k of keys) {
+        const { type, values } = schema[k], v = c[k], at = `${where} ${k}`
+        if (type === "label") assert.ok(values.includes(v), `${at}: "${v}" is not a label of the schema; add it there first`)
+        else if (type === "labels") assert.ok(Array.isArray(v) && v.every((x) => values.includes(x)), `${at}: ${JSON.stringify(v)} has a label not in the schema`)
+        else if (type === "number") assert.equal(typeof v, "number", at)
+        else if (type === "text") assert.equal(typeof v, "string", at)
+        else if (type === "map") for (const [part, used] of Object.entries(v)) {
+          assert.ok(schema[k].keys.includes(part), `${at}: part "${part}" is not in the schema`)
+          assert.ok(Array.isArray(used) && used.every((x) => values.includes(x)), `${at}.${part}: ${JSON.stringify(used)} has a label not in the schema`)
+        }
+        else if (type === "version") assert.match(v, /^\d+\.\d+\.\d+$/, at)
+        else assert.equal(type, "timing", at + ": unknown type")
+      }
+      assert.equal(c.status === "legacy", Number(c.version.split(".")[0]) < 1, where + ": legacy below 1.0.0, redrawn from 1.0.0")
+      const t = L.normalizeTheme(load(name + ".json")), ph = t.phases
+      for (const p of ["tense", "angry"])
+        assert.deepEqual(c[p + ".timing"], { frames: ph[p].frames.length, ms: ph[p].frameMs, loopFrom: ph[p].loopFrom }, `${where} ${p}.timing`)
+      assert.equal(c["palette.size"], Object.values(t.palette).filter((v) => v !== "transparent").length, where + " palette.size")
+      assert.deepEqual(c["colors.roles"].slice().sort(), [...new Set(Object.values(t.palette).filter((v) => !v.startsWith("#") && v !== "transparent"))].sort(), where + " colors.roles")
+      assert.equal(c["angry.flashes"], Math.max(...Object.values(CARDS).map((card) => worstFlashes(ph.angry, t.palette, card))), where + " angry.flashes")
+    }
+  })
+
+  test("no sprite flashes more than twice a second, on a light or a dark card", () => {
+    for (const f of files) {
+      const t = L.normalizeTheme(load(f))
+      for (const [k, v] of Object.entries(t.palette)) assert.ok(v === "transparent" || tokenRgba(v, CARDS.light), `${f} palette ${k}: ${v} is not a color the counter reads`)
+      for (const [name, phase] of Object.entries(t.phases))
+        for (const [cardName, card] of Object.entries(CARDS))
+          if (phase.frames.length > 1) {
+            const n = worstFlashes(phase, t.palette, card)
+            assert.ok(n <= 2, `${f} ${name} on the ${cardName} card: ${n} flashes in one second`)
+          }
+    }
   })
 })
