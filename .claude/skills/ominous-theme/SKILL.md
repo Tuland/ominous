@@ -11,11 +11,9 @@ writes `themes/<name>.json`. A user's own theme is a JSON file in
 `~/.config/omarchy/ominous/themes/` (format: `docs/custom-themes.md`). Never edit a shipped
 theme's JSON by hand: `tests/run.sh` fails when it differs from the script.
 
-`marine` and `shiba` are 40x40 and drawn from text grids in `tools/art/<theme>/`, redrawn in
-that order. `boss` is still 16x16 and drawn as coordinates in `tools/draw-themes.py`
-(`tests/themes.test.mjs` checks the sizes). Each is being redrawn, one change at a time, from
-reference images through drafts into text grids (see "Redrawing a character"). Until a
-character is redrawn, small fixes to it stay in the coordinate code.
+`marine`, `shiba` and `boss` are 40x40 and drawn from text grids in `tools/art/<theme>/`,
+redrawn in that order (`tests/themes.test.mjs` checks the sizes), each from reference images
+through drafts into text grids (see "Redrawing a character").
 
 ## Technique: codixel, with Ominous rules on top
 
@@ -69,9 +67,11 @@ ships it). Where codixel and this skill disagree, this skill wins:
   rest loops (the marine ignites, then burns); in angry with `shake`, the jolt lands at the loop
   start instead of the phase start.
 - **Captions:** one ironic line per phase, 80 characters at most, in the character's voice.
-- **Colors:** use roles where the color should follow the Omarchy theme: `urgent` for anger
-  marks, `accent` for a tie, `muted` for steam. Use hex for skin, fur, hair, fire and the sweat
-  drop (its fixed light blues, see the standards; the legacy boss keeps `accent` until its redraw). A near-black hex outline (`#1b1511`) reads on light and dark themes alike.
+- **Colors:** every playful character uses fixed hex colors only (skin, fur, hair, clothes, fire,
+  smoke and the sweat drop's fixed light blues, see the standards), so it looks the same under
+  every Omarchy theme. An anger mark uses fixed reds too, not `urgent`: a vein stops reading as
+  blood when the theme's urgent is not red. A near-black hex outline (`#1b1511`) reads on light
+  and dark themes alike.
   Phase colors: relaxed `accent`, tense left unset (the card blends accent into urgent), angry
   `urgent`.
 
@@ -119,7 +119,7 @@ above, not sheet keys). `version` and `status` say how far to trust a sheet: bel
 character is `legacy` (drawn before the standards; its values describe it, they are no model, and
 it waits for a redraw); 1.0.0 is the first redraw that meets the standards, a minor version a
 change to an approved look, a major one a new redraw. `codixel` maps each part (pixelation,
-palette, sweat drop, gaze, close-up, aura, eyes, particles, strikes, light) to the codixel tools
+palette, sweat drop, gaze, close-up, aura, eyes, particles, sign, strikes, light) to the codixel tools
 that built it, or `none`: before a new part, look at which skill section the others needed.
 
 ## Pixel pitfalls already met
@@ -129,8 +129,9 @@ that built it, or `none`: before a new part, look at which skill section the oth
 - Fangs suit animals, not people: an angry human scowls (mouth corners pulled down) or yells (a
   dark open mouth with a red tongue).
 - Lips drawn in the outline color right under the nose read as a moustache. Use the mouth color.
-- Do not overwrite the face outline with other details (a sweat drop, a vein): keep them inside
-  the face or outside the head.
+- Do not overwrite the face outline with other details (a sweat drop): keep them inside the face
+  or outside the head. The exception is an anger mark: as in manga, it sits in front, in a corner
+  of the head, over the contour if it must (drafts/boss sheets 027-028).
 - Read the ASCII first, then the rendered card. Some problems only show at real size.
 - No dither: each cell is a solid square, so a dithered cell reads as a stray square, not a
   blend.
@@ -175,10 +176,9 @@ that built it, or `none`: before a new part, look at which skill section the oth
 
 ## Workflow
 
-1. **Draw.** A character not yet redrawn: in `tools/draw-themes.py`, a function
-   `name(mood, variant)` that builds each frame from one base face, a palette, and an entry in
-   `THEMES`. A redrawn one: its grids (see above). Then run `tools/draw-themes.py --show` and
-   read every frame as text.
+1. **Draw.** Every character comes from its grids in `tools/art/<theme>/<phase>.txt` (see
+   above), with its palette and an entry in `THEMES` in `tools/draw-themes.py`. Then run
+   `tools/draw-themes.py --show` and read every frame as text.
 2. **Look at it rendered**, one phase at a time:
    `tools/shoot-card.sh <theme> playful <relaxed|tense|angry> <scratchpad>/<theme>-<phase>.png`
    and read the image. To see the animation, take a few shots 0.25 s apart. `shoot-card.sh`

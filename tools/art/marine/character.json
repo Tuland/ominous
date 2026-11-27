@@ -23,6 +23,7 @@
   "angry.aura": "fire",
   "angry.eyes": "ember",
   "angry.particles": "sparks",
+  "angry.sign": "none",
   "angry.strikes": "none",
   "angry.light": [],
   "angry.shake": "on-loop",
@@ -63,6 +64,9 @@
     ],
     "angry.particles": [
       "rng"
+    ],
+    "angry.sign": [
+      "none"
     ],
     "angry.strikes": [
       "none"

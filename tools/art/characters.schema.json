@@ -91,18 +91,21 @@
     "values": [
       "ignition",
       "nightfall",
+      "flush",
       "none"
     ]
   },
   "angry.faces": {
     "type": "labels",
-    "description": "The faces of the angry loop, in order: a short burst, then the long one",
+    "description": "The faces of the angry loop, in order: a short burst or a held face, then the long one",
     "values": [
       "laugh",
       "burn",
       "bark",
       "snarl",
-      "red-face"
+      "red-face",
+      "yell",
+      "scowl"
     ]
   },
   "angry.aura": {
@@ -111,6 +114,7 @@
     "values": [
       "fire",
       "mist",
+      "smoke",
       "none"
     ]
   },
@@ -129,6 +133,14 @@
     "values": [
       "sparks",
       "steam",
+      "none"
+    ]
+  },
+  "angry.sign": {
+    "type": "label",
+    "description": "A manga sign drawn over the head (fixed reds, in front of the outline)",
+    "values": [
+      "anger-mark",
       "none"
     ]
   },
@@ -199,6 +211,7 @@
       "angry.aura",
       "angry.eyes",
       "angry.particles",
+      "angry.sign",
       "angry.strikes",
       "angry.light"
     ],

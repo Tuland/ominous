@@ -224,13 +224,12 @@ tests that hold each rule, then update the map. A finding that is not fixed stop
 `marine`, `shiba` and `boss` are drawn in `tools/draw-themes.py`. Change the art there and
 rerun it; never edit their JSON by hand, because `tests/run.sh` fails when the two differ.
 
-`boss` is still drawn as coordinates in the script. A redrawn character goes
-through drafts instead: reference images (CC0, public domain or own) and draft scripts using
+Every character goes through drafts: reference images (CC0, public domain or own) and draft scripts using
 codixel (`mise run setup`) in `drafts/`, candidates compared on PNG sheets, then the chosen
 frames exported as text grids to `tools/art/<theme>/<phase>.txt` (rows of palette letters,
-frames separated by one empty line). `marine` and `shiba` are drawn this way: the script reads
-their grids from `tools/art/<theme>/` (`read_grids`) and keeps their palette, captions, timings
-and `shake`. A palette color may carry alpha (`#rrggbbaa`, the shiba's storm mist). Each
+frames separated by one empty line). The script reads the grids from `tools/art/<theme>/`
+(`read_grids`) and keeps each palette, captions, timings and `shake`. A palette color may carry
+alpha (`#rrggbbaa`, the shiba's storm mist, the boss's smoke). Each
 character is also summed up in `tools/art/<theme>/character.json`, with the keys and labels of
 `tools/art/characters.schema.json` (checked by `tests/themes.test.mjs`).
 A grid that breaks the contract (an unknown letter, a short row, trailing spaces, a size over

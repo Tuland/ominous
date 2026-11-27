@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Draws the playful themes' pixel art and writes themes/marine.json, shiba.json and boss.json.
 
-The marine and the shiba come from text grids in tools/art/<theme>/ (read by read_grids,
-exported from approved drafts); the boss is still code, so each expression is built from the
-same face and changes stay small. Edit a grid or a function below, then run
+Every playful character comes from text grids in tools/art/<theme>/ (read by read_grids,
+exported from approved drafts); this script owns their palettes, captions and timing. Edit a
+grid or a value below, then run
 
     tools/draw-themes.py            write the three theme files
     tools/draw-themes.py --show     write them and print every frame as text, to review
@@ -11,60 +11,21 @@ same face and changes stay small. Edit a grid or a function below, then run
 
 tests/run.sh runs --check, so a hand edit to one of these JSON files has to be made here too.
 All characters are original (no third-party art; see docs/themes.md).
-Palette letters: "." is transparent, roles (accent, urgent, muted, ...) follow the Omarchy theme.
+Palette letters: "." is transparent, the others fixed colors (#rrggbb, or #rrggbbaa over the card).
 """
 import json
 import os
 import sys
 from typing import Any
 
-Grid = list[list[str]]  # N rows of N palette characters
 Frame = list[str]  # the grid as text rows, as a theme file stores it
 Theme = dict[str, Any]  # a theme file's JSON object
 
-N = 16  # the boss, still drawn as coordinates
 THEMES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "themes")
 ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 PHASES = ("relaxed", "tense", "angry")
 MAX_CELLS = 40  # the card's sprite limit (Logic.MAX_SPRITE)
 MAX_FRAMES = 64  # per phase (Logic.MAX_FRAMES)
-
-
-def blank() -> Grid:
-    """Returns an empty N x N grid, every cell transparent (".")."""
-    return [["."] * N for _ in range(N)]
-
-
-def put(g: Grid, pts: list[tuple[int, int]], c: str) -> None:
-    """Paints single pixels, skipping any outside the grid.
-
-    Args:
-        g: The grid, changed in place.
-        pts: (x, y) pairs.
-        c: The palette character to paint.
-    """
-    for x, y in pts:
-        if 0 <= x < N and 0 <= y < N:
-            g[y][x] = c
-
-
-def rect(g: Grid, x0: int, y0: int, x1: int, y1: int, c: str) -> None:
-    """Fills a rectangle, corners included.
-
-    Args:
-        g: The grid, changed in place.
-        x0: Left column.
-        y0: Top row.
-        x1: Right column.
-        y1: Bottom row.
-        c: The palette character to paint.
-    """
-    put(g, [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)], c)
-
-
-def rows(g: Grid) -> Frame:
-    """Returns the grid as text rows, the form a theme file stores."""
-    return ["".join(r) for r in g]
 
 
 # ---------------------------------------------------------------- marine
@@ -220,86 +181,42 @@ SHIBA: Theme = {
 
 
 # ---------------------------------------------------------------- boss
-def boss(mood: str, variant: int = 0) -> Frame:
-    """Draws the boss: an executive in suit and tie.
+# From drafts/boss/work/export.js (sheet 036): 91 colors, one ASCII letter each; the smoke's
+# steps carry alpha (#rrggbbaa), drawn over the card. Fixed colors only, the tie included.
+BOSS_PALETTE: dict[str, str] = {
+        ".": "transparent", "!": "#293551", "#": "#1b1511", "$": "#26324e", "%": "#d58a6d", "&": "#e9a080",
+        "'": "#bd7a60", "(": "#edbca5", ")": "#c7493a", "*": "#c0c4cb99", "+": "#c0c4cb75", ",": "#868c9675",
+        "-": "#a86b57", "/": "#868c9699", "0": "#a44b42", "1": "#868c9652", "2": "#835547", "3": "#c0c4cb52",
+        "4": "#1f2d4a", "5": "#e05342", "6": "#5f6371", "7": "#c0c4cb33", "8": "#c0c4cb1a", "9": "#6f342d",
+        ":": "#7c7881", ";": "#868c961a", "<": "#868c9633", "=": "#8c6259", ">": "#864e49", "?": "#7f3e37",
+        "@": "#e56f60", "A": "#868c96bf", "B": "#ea8c80", "C": "#d3d2d6", "D": "#e6e6e9", "E": "#a4a9b299",
+        "F": "#c2bdc2", "G": "#72483b", "H": "#a4a9b252", "I": "#968a8e", "J": "#ff2d2d", "K": "#c1644d",
+        "L": "#aea7ab", "M": "#a4a9b275", "N": "#713d32", "O": "#c0c4cbbf", "P": "#a4a9b233", "Q": "#db7057",
+        "R": "#5b211b", "S": "#c55240", "T": "#81473d", "U": "#a65b4c", "V": "#a4a9b21a", "W": "#e8896f",
+        "X": "#51111f", "Y": "#e05c47", "Z": "#c35b47", "[": "#eda591", "]": "#89574f", "^": "#a55145",
+        "_": "#c7948c", "`": "#a4a9b2bf", "a": "#661625", "b": "#e67865", "c": "#de664f", "d": "#a65648",
+        "e": "#eb9585", "f": "#5c291f", "g": "#e7806a", "h": "#8a0014", "i": "#ec9d8b", "j": "#3b0c17",
+        "k": "#d81a2e", "l": "#5c3326", "m": "#801b2c", "n": "#340b11", "o": "#c86f69", "p": "#46424f",
+        "q": "#8ec6e8", "r": "#d66d6e", "s": "#a85656", "t": "#ff9a92", "u": "#b0081c", "v": "#c7837b",
+        "w": "#c8766f", "x": "#c77c75", "y": "#5b9bd0", "z": "#491316", "{": "#192132", "|": "#d9795e",
+        "}": "#eef9ff", "~": "#c4e6f6",
+}
 
-    Args:
-        mood: "relaxed", "tense" or "angry".
-        variant: The animation frame of that mood.
-
-    Returns:
-        The frame as text rows.
-    """
-    g = blank()
-    angry = mood == "angry"
-    skin, shade = ("z", "Z") if angry else ("s", "S")
-    # head with slicked hair, outlined automatically
-    spans = {1: (5, 10), 2: (3, 12), 3: (2, 13), 4: (2, 13), 5: (2, 13), 6: (2, 13), 7: (2, 13),
-             8: (2, 13), 9: (2, 13), 10: (3, 12), 11: (4, 11)}
-    shape = {(x, y) for y, (a, b) in spans.items() for x in range(a, b + 1)}
-    shape |= {(1, 6), (1, 7), (14, 6), (14, 7)}  # ears
-    for (x, y) in shape:
-        g[y][x] = skin
-    for (x, y) in list(shape):
-        if any((x + dx, y + dy) not in shape for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-            g[y][x] = "k"
-    for y in (2, 3):
-        for x in range(spans[y][0] + 1, spans[y][1]):
-            g[y][x] = "H"
-    put(g, [(3, 4), (12, 4), (3, 5), (12, 5)], "H")  # sideburns
-    put(g, [(4, 2), (5, 2), (6, 2), (4, 3)], "h")     # side part shine
-    for y in range(7, 10):
-        put(g, [(3, y), (12, y)], shade)
-    put(g, [(7, 8), (8, 8)], shade)  # nose
-    # neck, collar, tie, jacket
-    rect(g, 6, 12, 9, 12, shade); put(g, [(5, 12), (10, 12)], "k")
-    tie = "N" if angry else "n"
-    rect(g, 2, 13, 13, 13, "j"); put(g, [(5, 13), (6, 13), (9, 13), (10, 13)], "w"); rect(g, 7, 13, 8, 13, tie)
-    rect(g, 0, 14, 15, 15, "j"); put(g, [(5, 14), (10, 14), (4, 15), (11, 15)], "J")
-    rect(g, 6, 14, 9, 15, "w"); rect(g, 7, 14, 8, 15, tie)
-    put(g, [(0, 13), (1, 13), (14, 13), (15, 13)], ".")
-
-    if mood == "relaxed":
-        rect(g, 4, 5, 6, 5, "k"); rect(g, 9, 5, 11, 5, "k")          # level brows
-        put(g, [(5, 7), (6, 7), (9, 7), (10, 7)], "k")               # half-closed, pleased with himself
-        put(g, [(5, 6), (6, 6), (9, 6), (10, 6)], shade)             # heavy lids
-        put(g, [(6, 10), (7, 10), (8, 10), (9, 9)], "m")             # smirk
-    elif mood == "tense":
-        put(g, [(4, 4), (5, 4), (6, 4), (9, 4), (10, 4), (11, 4)], "k")  # brows up
-        rect(g, 4, 6, 6, 7, "w"); rect(g, 9, 6, 11, 7, "w")
-        px = 4 if variant == 0 else 6
-        put(g, [(px, 6), (px, 7), (px + 5, 6), (px + 5, 7)], "k")      # eyes darting
-        rect(g, 6, 10, 9, 10, "m")                                     # tight line
-        dy = 0 if variant == 0 else 1
-        put(g, [(12, 4 + dy), (12, 5 + dy)], "b")                      # sweat
-    else:
-        put(g, [(4, 5), (5, 5), (6, 6), (11, 5), (10, 5), (9, 6)], "k")  # slanted brows
-        rect(g, 4, 7, 6, 7, "w"); rect(g, 9, 7, 11, 7, "w"); put(g, [(5, 7), (10, 7)], "r")
-        # lips in the mouth color, not the outline's, or the scowl reads as a moustache
-        if variant == 1:  # yelling: a round open mouth, dark inside, tongue at the bottom, no teeth
-            rect(g, 6, 9, 9, 9, "m"); put(g, [(5, 10), (10, 10)], "m")
-            rect(g, 6, 10, 9, 10, "k"); rect(g, 7, 10, 8, 10, "r")
-        else:  # scowl: lips pressed, corners pulled down
-            rect(g, 6, 9, 9, 9, "m"); put(g, [(5, 10), (10, 10)], "m")
-        if variant == 0:  # steam out of the ears, rising
-            put(g, [(0, 5), (0, 4), (15, 5), (15, 4)], "f")
-        elif variant == 2:
-            put(g, [(1, 3), (0, 2), (14, 3), (15, 2)], "f")
-    return rows(g)
-
+try:
+    BOSS_FRAMES = read_grids("boss", BOSS_PALETTE)
+except GridError as e:
+    sys.exit(f"draw-themes: {e}")
 
 BOSS: Theme = {
     "progress": False,
-    "palette": {
-        ".": "transparent", "k": "#1b1511", "H": "#2e2622", "h": "#5a4d44", "s": "#e6b98f", "S": "#c9976c",
-        "z": "#e07a5a", "Z": "#c25a40", "w": "#f4f1ea", "T": "#f4f1ea", "m": "#7a3a30", "r": "urgent",
-        "b": "accent", "n": "accent", "N": "urgent", "j": "#56606e", "J": "#3f4651", "f": "muted",
-    },
+    "palette": BOSS_PALETTE,
     "phases": {
-        "relaxed": {"color": "accent", "caption": "Let's circle back.", "frames": [boss("relaxed")]},
-        "tense": {"caption": "Can you see my screen?", "frameMs": 900, "frames": [boss("tense", 0), boss("tense", 1)]},
-        "angry": {"color": "urgent", "caption": "Per my last email.", "frameMs": 250, "shake": True,
-                  "frames": [boss("angry", 0), boss("angry", 1), boss("angry", 2)]},
+        "relaxed": {"color": "accent", "caption": "Let's circle back.", "frames": BOSS_FRAMES["relaxed"]},
+        # holding his temper, eyes darting and a sweat drop: one held close-up on entering the phase, then the bust in a loop
+        "tense": {"caption": "Can you see my screen?", "frameMs": 900, "loopFrom": 8, "frames": BOSS_FRAMES["tense"]},
+        # red climbs his skin as smoke gathers, then a loop: a held yell (the jolt lands on it), then the scowl
+        "angry": {"color": "urgent", "caption": "Again? The whole team is waiting.", "frameMs": 120, "shake": True,
+                  "loopFrom": 10, "frames": BOSS_FRAMES["angry"]},
     },
 }
 

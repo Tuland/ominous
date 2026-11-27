@@ -440,8 +440,8 @@ describe("shipped themes", () => {
     for (const p of ["relaxed", "tense", "angry"]) assert.equal(t.phases[p].caption, "")
   })
 
-  // marine and shiba are redrawn at 40x40; the boss stays 16x16 until its own redraw
-  for (const [name, size] of [["marine", 40], ["shiba", 40], ["boss", 16]]) {
+  // every playful character is a 40x40 bust
+  for (const [name, size] of [["marine", 40], ["shiba", 40], ["boss", 40]]) {
     test(name + ": three distinct expressions, captions, growing animation", () => {
       const t = L.normalizeTheme(load(name + ".json"))
       assert.equal(t.cols, size)
@@ -463,7 +463,7 @@ describe("shipped themes", () => {
     })
   }
 
-  for (const name of ["marine", "shiba"])
+  for (const name of ["marine", "shiba", "boss"])
   test(name + ": tense and angry play an intro once, then loop; the jolt waits for the loop", () => {
     const ph = L.normalizeTheme(load(name + ".json")).phases
     assert.ok(ph.tense.loopFrom > 0 && ph.tense.loopFrom < ph.tense.frames.length)
@@ -471,6 +471,16 @@ describe("shipped themes", () => {
     assert.equal(ph.angry.shake, true)
     assert.equal(L.joltOnEnter("angry", ph.angry), false)
     assert.equal(L.joltOnStep("angry", ph.angry, ph.angry.loopFrom - 1, ph.angry.loopFrom), true)
+  })
+
+  // what the generic tests let through: the boss's captions and timings, and fixed colors only
+  test("boss: its captions, timings and fixed colors", () => {
+    const raw = load("boss.json"), ph = L.normalizeTheme(raw).phases
+    assert.deepEqual(["relaxed", "tense", "angry"].map((p) => ph[p].caption),
+      ["Let's circle back.", "Can you see my screen?", "Again? The whole team is waiting."])
+    assert.deepEqual([ph.tense.frames.length, ph.tense.frameMs, ph.tense.loopFrom], [12, 900, 8], "tense timing")
+    assert.deepEqual([ph.angry.frames.length, ph.angry.frameMs, ph.angry.loopFrom, ph.angry.shake], [34, 120, 10, true], "angry timing")
+    for (const [k, v] of Object.entries(raw.palette)) assert.ok(v === "transparent" || v.startsWith("#"), `boss palette ${k}: ${v} names a role`)
   })
 
   test("no third-party names in theme files", () => {
@@ -507,6 +517,20 @@ describe("shipped themes", () => {
       assert.deepEqual(c["colors.roles"].slice().sort(), [...new Set(Object.values(t.palette).filter((v) => !v.startsWith("#") && v !== "transparent"))].sort(), where + " colors.roles")
       assert.equal(c["angry.flashes"], Math.max(...Object.values(CARDS).map((card) => worstFlashes(ph.angry, t.palette, card))), where + " angry.flashes")
     }
+  })
+
+  // the generic checks above only see that a label exists; these pin what the boss was approved as
+  test("boss character sheet: the redrawn boss's values", () => {
+    const c = JSON.parse(readFileSync(new URL("../tools/art/boss/character.json", import.meta.url), "utf8"))
+    const want = {
+      version: "1.0.0", status: "redrawn", "style.shading": "realistic", "tense.closeup": "held", "tense.sweat": "drop",
+      "angry.intro": "flush", "angry.aura": "smoke", "angry.sign": "anger-mark", "angry.particles": "none",
+      "angry.shake": "on-loop", "caption.voice": "jargon",
+    }
+    for (const [k, v] of Object.entries(want)) assert.equal(c[k], v, `boss/character.json ${k}`)
+    assert.deepEqual(c["angry.faces"], ["yell", "scowl"], "boss/character.json angry.faces")
+    assert.deepEqual(c["colors.roles"], [], "boss/character.json colors.roles")
+    assert.ok(c["angry.flashes"] <= 2, "boss/character.json angry.flashes")
   })
 
   test("no sprite flashes more than twice a second, on a light or a dark card", () => {

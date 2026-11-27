@@ -20,9 +20,14 @@ All notable changes to Ominous are listed here. The format follows
 - The `shiba` is redrawn: a 40x40 bust of a red shiba. Tense has darting eyes, a sweat drop and
   one close-up; angry starts as night falls and its eyes light up, then it barks and snarls in a
   lightning storm, each strike lighting it. The storm never flashes more than twice a second.
+- The `boss` is redrawn: a 40x40 bust of an older office manager in a suit. Tense holds his
+  temper with darting eyes, a sweat drop and one close-up; angry starts as red climbs his face,
+  then he yells and scowls while smoke rises off him and an anger mark trembles over his head.
+  Its angry caption is now "Again? The whole team is waiting.", and its tie no longer takes the
+  theme's accent and urgent colors.
 - The `marine`'s skin is a little warmer.
 - Sprites can be up to 40x40 cells (was 32x32). Each cell is now 5 screen pixels at the default
-  scale (was 7), so `boss` and user themes are drawn smaller until they are redrawn.
+  scale (was 7), so user themes are drawn smaller until they are redrawn.
 - The sprite is centred on the card's text, from the title to the caption, and the card grows
   taller when the sprite needs it.
 - The caption is drawn in the card's text color, no longer in the phase color.

@@ -23,6 +23,7 @@
   "angry.aura": "mist",
   "angry.eyes": "glow",
   "angry.particles": "none",
+  "angry.sign": "none",
   "angry.strikes": "bolts",
   "angry.light": [
     "night",
@@ -67,6 +68,9 @@
       "none"
     ],
     "angry.particles": [
+      "none"
+    ],
+    "angry.sign": [
       "none"
     ],
     "angry.strikes": [

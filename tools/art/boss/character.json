@@ -1,66 +1,70 @@
 {
-  "version": "0.1.0",
-  "status": "legacy",
+  "version": "1.0.0",
+  "status": "redrawn",
   "cue": "suit",
-  "style.shading": "flat",
-  "ref.source": "none",
-  "palette.size": 17,
+  "style.shading": "realistic",
+  "ref.source": "ai-sheet-05, ai-sheet-06",
+  "palette.size": 91,
   "relaxed.face": "smug",
   "tense.face": "sweating",
   "tense.gaze": "dart",
   "tense.sweat": "drop",
-  "tense.closeup": "none",
+  "tense.closeup": "held",
   "tense.timing": {
-    "frames": 2,
+    "frames": 12,
     "ms": 900,
-    "loopFrom": 0
+    "loopFrom": 8
   },
-  "angry.intro": "none",
+  "angry.intro": "flush",
   "angry.faces": [
-    "red-face"
+    "yell",
+    "scowl"
   ],
-  "angry.aura": "none",
+  "angry.aura": "smoke",
   "angry.eyes": "plain",
-  "angry.particles": "steam",
+  "angry.particles": "none",
+  "angry.sign": "anger-mark",
   "angry.strikes": "none",
   "angry.light": [],
-  "angry.shake": "on-enter",
+  "angry.shake": "on-loop",
   "angry.timing": {
-    "frames": 3,
-    "ms": 250,
-    "loopFrom": 0
+    "frames": 34,
+    "ms": 120,
+    "loopFrom": 10
   },
   "angry.flashes": 0,
-  "colors.roles": [
-    "accent",
-    "muted",
-    "urgent"
-  ],
+  "colors.roles": [],
   "caption.voice": "jargon",
   "codixel": {
     "pixelation": [
-      "none"
+      "removeBg",
+      "resize",
+      "quantize"
     ],
     "palette": [
-      "none"
+      "quantize"
     ],
     "tense.sweat": [
-      "none"
+      "hand-drawn"
     ],
     "tense.gaze": [
       "none"
     ],
     "tense.closeup": [
-      "none"
+      "removeBg",
+      "resize"
     ],
     "angry.aura": [
-      "none"
+      "loopNoise"
     ],
     "angry.eyes": [
       "none"
     ],
     "angry.particles": [
       "none"
+    ],
+    "angry.sign": [
+      "hand-drawn"
     ],
     "angry.strikes": [
       "none"
